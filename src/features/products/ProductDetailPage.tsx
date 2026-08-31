@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useHistory } from 'react-router';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonBackButton, IonButtons, IonModal, IonInput, IonItem, IonLabel, IonCheckbox } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
@@ -33,6 +33,7 @@ type FreshnessClassName = 'LIVE' | 'FRESH' | 'RECENT' | 'AGING' | 'HISTORICAL';
 
 export function ProductDetailPage(): JSX.Element {
   const { productId } = useParams<{ productId: string }>();
+  const history = useHistory();
   const { selected } = useWarehouse();
   const [product, setProduct] = useState<ProductRow | null>(null);
   const [state, setState] = useState<StateRow | null>(null);
@@ -238,6 +239,7 @@ export function ProductDetailPage(): JSX.Element {
                 <IonButton onClick={() => setShowWatchModal(true)}>Watch</IonButton>
                 <IonButton fill="outline" onClick={() => setShowConfirmModal(true)}>Verify price</IonButton>
                 <IonButton fill="outline" onClick={() => setShowChangeModal(true)}>Report change</IonButton>
+                <IonButton fill="outline" onClick={() => history.push(`/product/${productId}/buy`)}>Bought it</IonButton>
               </div>
             </section>
           ) : (

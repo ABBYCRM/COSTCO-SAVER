@@ -9,6 +9,7 @@ import { AccountPage } from '@features/account/AccountPage';
 import { AppShell } from '@app/layouts/AppShell';
 import { ProductDetailPage } from '@features/products/ProductDetailPage';
 import { SearchPage } from '@features/products/SearchPage';
+import { BuyItPage } from '@features/products/BuyItPage';
 import { AuthGate } from '@features/auth/AuthGate';
 
 import '@ionic/react/css/core.css';
@@ -39,6 +40,7 @@ export function App(): JSX.Element {
               <Route exact path="/saved" component={SavedPage} />
               <Route exact path="/account" component={AccountPage} />
               <Route exact path="/product/:productId" component={ProductDetailPage} />
+              <Route exact path="/product/:productId/buy" component={BuyItPage} />
               <Route exact path="/search" component={SearchPage} />
             </IonRouterOutlet>
           </IonSplitPane>
