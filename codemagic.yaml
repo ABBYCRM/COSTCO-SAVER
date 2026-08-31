@@ -1,0 +1,225 @@
+# COSTCO-SAVER — Codemagic CI/CD
+# Spec §86–§89. Five workflows: verify / android-internal / ios-testflight / release-candidate / production.
+#
+# Required Codemagic secret groups (configure in the Codemagic UI):
+#   costco_saver_apple    — APPLE_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_KEY_CONTENTS (p8), ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_KEY (p8)
+#   costco_saver_google   — GCLOUD_SERVICE_ACCOUNT_CONTENTS (json), PLAY_TRACK_JSON_KEY_CONTENTS, ANDROID_KEYSTORE, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#   costco_saver_env      — SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, SENTRY_DSN, BRAND_RETAILER_NAME
+#
+# Build numbers increment automatically.
+# Triggers: every push to main, every PR, every tag v*.*.*.
+
+workflows:
+
+  verify:
+    name: Verify (lint, typecheck, unit, integration, security, build)
+    max_build_duration: 60
+    environment:
+      node: 20.15.0
+      npm: 10.8.1
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Format check
+        script: npm run format:check
+      - name: Lint
+        script: npm run lint
+      - name: TypeScript
+        script: npm run typecheck
+      - name: Unit tests
+        script: npm run test:unit
+      - name: Integration tests
+        script: npm run test:integration
+      - name: Security / RLS tests
+        script: npm run test:security
+      - name: Web build
+        script: npm run build
+      - name: No-stub scan
+        script: npm run no-stub-scan
+    triggering:
+      events:
+        - push
+        - pull_request
+
+  android-internal:
+    name: Android — Play Internal Track
+    max_build_duration: 90
+    environment:
+      node: 20.15.0
+      npm: 10.8.1
+      java: 17
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Test
+        script: npm run test:unit && npm run test:integration && npm run test:security
+      - name: Web build
+        script: npm run build
+      - name: Inject env
+        script: |
+          cat > .env.production <<EOF
+          VITE_SUPABASE_URL=$SUPABASE_URL
+          VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          VITE_BRAND_RETAILER_NAME=$BRAND_RETAILER_NAME
+          VITE_SENTRY_DSN=$SENTRY_DSN
+          EOF
+      - name: Capacitor sync
+        script: npx cap sync android
+      - name: Bump version
+        script: |
+          VERSION_NAME=$(node -e "console.log(require('./package.json').version)")
+          BUILD_NUMBER=$CM_BUILD_NUMBER
+          sed -i "s/versionCode [0-9]*/versionCode $BUILD_NUMBER/" android/app/build.gradle || true
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle || true
+      - name: Assemble release AAB
+        script: |
+          cd android && ./gradlew assembleRelease
+      - name: Bundle release AAB
+        script: |
+          cd android && ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/app-release.aab
+      - android/app/build/outputs/apk/release/app-release.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CONTENTS
+        track: internal
+        submit_as_draft: true
+        mapping_file_upload: true
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: 2026-*/feature/*
+          include: true
+
+  ios-testflight:
+    name: iOS — TestFlight
+    max_build_duration: 90
+    environment:
+      node: 20.15.0
+      npm: 10.8.1
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Test
+        script: npm run test:unit && npm run test:integration && npm run test:security
+      - name: Web build
+        script: npm run build
+      - name: Inject env
+        script: |
+          cat > .env.production <<EOF
+          VITE_SUPABASE_URL=$SUPABASE_URL
+          VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          VITE_BRAND_RETAILER_NAME=$BRAND_RETAILER_NAME
+          VITE_SENTRY_DSN=$SENTRY_DSN
+          EOF
+      - name: Capacitor sync
+        script: npx cap sync ios
+      - name: Pod install
+        script: |
+          cd ios/App && pod install
+      - name: Set build number
+        script: |
+          cd ios/App && /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $CM_BUILD_NUMBER" App/Info.plist
+      - name: Build & archive
+        script: |
+          cd ios/App && xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=$APPLE_IDENTITY \
+            PROVISIONING_PROFILE_SPECIFIER=$APPLE_PROVISIONING_PROFILE \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
+            archive
+    artifacts:
+      - ios/App/build/App.xcarchive
+      - ios/App/build/Build/Products/Release-iphoneos/App.ipa
+    publishing:
+      app_store_connect:
+        auth: api_key
+        api_key: $ASC_API_KEY
+        submit_to_testflight: true
+        distribute_external: false
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: 2026-*/feature/*
+          include: true
+
+  release-candidate:
+    name: Release Candidate
+    max_build_duration: 120
+    environment:
+      node: 20.15.0
+      npm: 10.8.1
+    scripts:
+      - name: Full verify
+        script: npm run test:all
+      - name: Web build
+        script: npm run build
+      - name: Capacitor sync
+        script: npx cap sync
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+          include: true
+
+  production:
+    name: Production
+    max_build_duration: 180
+    environment:
+      node: 20.15.0
+      npm: 10.8.1
+      java: 17
+      xcode: latest
+    scripts:
+      - name: Full verify + E2E
+        script: |
+          npm ci
+          npm run test:all
+          npm run build
+          npx cap sync
+      - name: Android bundle
+        script: cd android && ./gradlew bundleRelease
+      - name: iOS archive
+        script: |
+          cd ios/App && pod install && \
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -archivePath build/App.xcarchive -destination 'generic/platform=iOS' \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=$APPLE_IDENTITY \
+            PROVISIONING_PROFILE_SPECIFIER=$APPLE_PROVISIONING_PROFILE \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID archive
+    artifacts:
+      - android/app/build/outputs/bundle/release/app-release.aab
+      - ios/App/build/App.xcarchive
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CONTENTS
+        track: production
+        submit_as_draft: true
+        mapping_file_upload: true
+      app_store_connect:
+        auth: api_key
+        api_key: $ASC_API_KEY
+        submit_to_testflight: false
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+'
+          include: true
