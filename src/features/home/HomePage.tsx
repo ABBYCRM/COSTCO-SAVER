@@ -139,9 +139,14 @@ export function HomePage(): JSX.Element {
             <h2 className="cs-strong" style={{ margin: 'var(--cs-space-1) 0 0 0' }}>
               {selected?.name ?? 'Pick a warehouse'}
             </h2>
-            <button className="cs-button cs-button--ghost" onClick={() => setShowPicker(true)} style={{ marginTop: 'var(--cs-space-3)' }}>
-              Switch warehouse
-            </button>
+            <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
+              <button className="cs-button cs-button--ghost" onClick={() => setShowPicker(true)}>
+                Switch warehouse
+              </button>
+              <button className="cs-button" onClick={() => location.assign('/search')}>
+                Search products
+              </button>
+            </div>
           </section>
 
           <section style={{ marginTop: 'var(--cs-space-5)' }}>

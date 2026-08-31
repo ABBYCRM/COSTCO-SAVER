@@ -13,7 +13,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/react';
-import { homeOutline, scanOutline, bookmarkOutline, personOutline, pricetagOutline } from 'ionicons/icons';
+import { homeOutline, scanOutline, bookmarkOutline, personOutline, pricetagOutline, searchOutline } from 'ionicons/icons';
 import { Redirect, Route } from 'react-router';
 import { HomePage } from '@features/home/HomePage';
 import { DealsPage } from '@features/deals/DealsPage';
@@ -42,6 +42,10 @@ export function AppShell(): JSX.Element {
               <IonItem routerLink="/deals" routerDirection="root">
                 <IonIcon icon={pricetagOutline} slot="start" />
                 <IonLabel>Deals</IonLabel>
+              </IonItem>
+              <IonItem routerLink="/search" routerDirection="root">
+                <IonIcon icon={searchOutline} slot="start" />
+                <IonLabel>Search</IonLabel>
               </IonItem>
               <IonItem routerLink="/saved" routerDirection="root">
                 <IonIcon icon={bookmarkOutline} slot="start" />
