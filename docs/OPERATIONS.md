@@ -8,7 +8,7 @@ tasks that keep the system honest.
 
 | Surface | URL | App id / repo |
 | --- | --- | --- |
-| Web app | (assigned by DO App Platform) | `3f0056fa-47f1-4d61-9fec-cc7fe56b1257` (DO App) — branch `2026-08-31/feature/phase-0-bootstrap` |
+| **Web app (live)** | **https://costco-saver-kvacx.ondigitalocean.app** | DO App `3f0056fa-47f1-4d61-9fec-cc7fe56b1255` — branch `2026-08-31/feature/phase-0-bootstrap` |
 | iOS TestFlight | (TBD by Codemagic) | `costco_saver_apple` secret group |
 | Android Play Internal | (TBD by Codemagic) | `costco_saver_google` secret group |
 | Supabase | (TBD by operator) | migrations under `supabase/migrations/` |
@@ -151,3 +151,55 @@ every standard API call.
 
 Codemagic has a one-click "Revert to last successful build" on every
 workflow page. Use that first.
+
+## Known deploy issues
+
+### Heroku Node buildpack passes `--unsafe-perm` to npm 12
+
+Symptom: every build fails in ~30-40 seconds with no useful UI logs.
+The S3 build log shows:
+
+```
+-----> Installing dependencies
+       Installing node modules
+       npm error code EUNKNOWNCONFIG
+       npm error Unknown cli flag: --unsafe-perm
+```
+
+The Heroku Node buildpack bootstraps npm 12, but its install script
+still passes the legacy `--unsafe-perm` flag that npm 12 rejects.
+
+Fix (already committed):
+
+1. Pin Node and npm in `package.json` to a version whose bundled npm
+   accepts the flag:
+   ```json
+   "engines": { "node": "22.11.0", "npm": "10.9.3" }
+   ```
+2. Add a `.npmrc` at the repo root that documents the override:
+   ```
+   legacy-peer-deps=true
+   unsafe-perm=false
+   ```
+
+### Build logs are not in the deployment response
+
+`/v2/apps/{id}/deployments/{dep}/logs` returns `log_type specification
+is required` no matter what enum value is sent over REST. The actual
+build log is a gzipped S3 object exposed via the historic URL in
+`/v2/apps/{id}/deployments/{dep}/components/{component}/logs?type=BUILD`.
+Use Python (or curl with `--compressed`) to fetch and decompress it.
+
+### `cloud sandbox DNS blocks api.digitalocean.com`
+
+The DO API works when called with `--resolve api.digitalocean.com:443:<ip>`.
+Use the `A` record returned by `socket.gethostbyname('api.digitalocean.com')`
+on the cloud sandbox. Outside the sandbox, the API is reachable directly.
+
+### Two `package.json` files break the Heroku buildpack
+
+The Heroku Node buildpack does a recursive search for the first
+`package.json` and will pick the wrong one if a subdirectory also
+has one. Place the admin scaffold in `admin-scaffold/` (or another
+non-standard directory name) and remove any sub-package.json before
+the build.
