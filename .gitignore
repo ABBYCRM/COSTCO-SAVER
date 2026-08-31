@@ -69,6 +69,6 @@ supabase/.branches
 supabase/.temp
 supabase/.env
 
-# admin bundle
-admin/dist/
-admin/node_modules/
+# admin scaffold (separate bundle, Phase 3 deliverable)
+admin-scaffold/dist/
+admin-scaffold/node_modules/

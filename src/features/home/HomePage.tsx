@@ -4,6 +4,7 @@ import { supabase } from '@services/supabase/client';
 import { listWarehouses, type WarehouseRow } from '@services/api/warehouses';
 import { useWarehouse } from '@stores/warehouse';
 import { WarehousePicker } from '@features/warehouses/WarehousePicker';
+import { CoverageCard } from '@features/warehouses/CoverageCard';
 import { formatUSD, cents } from '@domain/money/cents';
 import { first, type MaybeArray } from '@services/api/joins';
 
@@ -148,6 +149,8 @@ export function HomePage(): JSX.Element {
               </button>
             </div>
           </section>
+
+          {selected && <div style={{ marginTop: 'var(--cs-space-3)' }}><CoverageCard warehouseId={selected.id} /></div>}
 
           <section style={{ marginTop: 'var(--cs-space-5)' }}>
             <h2 className="cs-section-title">Recent price drops</h2>
