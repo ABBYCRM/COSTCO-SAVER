@@ -68,3 +68,7 @@ test-results/
 supabase/.branches
 supabase/.temp
 supabase/.env
+
+# admin bundle
+admin/dist/
+admin/node_modules/
