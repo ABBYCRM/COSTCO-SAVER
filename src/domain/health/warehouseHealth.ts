@@ -64,11 +64,25 @@ export function computeWarehouseHealth(input: WarehouseHealthInput): WarehouseHe
 
   const score = Math.max(0, Math.min(100, coverage + freshness + contributor + conflict + evidence + volume));
 
+  // A warehouse with no observations or no contributors is "Building" regardless
+  // of how fresh nothing is, because freshness is meaningless when there is no
+  // activity to be fresh about.
+  const hasActivity = input.activeObservedProducts > 0
+    || input.distinctContributorsLast30d > 0
+    || input.dailyVerificationVolume7d > 0;
+
   let label: WarehouseHealthLabel;
-  if (score >= 80) label = 'Excellent coverage';
-  else if (score >= 60) label = 'Good coverage';
-  else if (score >= 35) label = 'Limited coverage';
-  else label = 'Building coverage';
+  if (!hasActivity) {
+    label = 'Building coverage';
+  } else if (score >= 80) {
+    label = 'Excellent coverage';
+  } else if (score >= 60) {
+    label = 'Good coverage';
+  } else if (score >= 35) {
+    label = 'Limited coverage';
+  } else {
+    label = 'Building coverage';
+  }
 
   return { score, label, components: { coverage, freshness, contributor, conflict, evidence, volume } };
 }

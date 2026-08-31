@@ -69,9 +69,7 @@ export function AppShell(): JSX.Element {
 
 /**
  * Bottom tab bar with the 5 tabs. The split-pane routes use IonTabs for
- * the small-viewport layout. This component is rendered inside the
- * primary route, not at the layout level, to keep desktop and mobile
- * layouts consistent with Ionic defaults.
+ * the small-viewport layout.
  */
 export function BottomTabs(): JSX.Element {
   return (

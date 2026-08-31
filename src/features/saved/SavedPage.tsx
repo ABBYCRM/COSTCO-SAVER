@@ -9,7 +9,7 @@ interface WatchRow {
   notify_clearance: boolean;
   notify_manager_markdown: boolean;
   enabled: boolean;
-  products: { canonical_name: string; brand: string | null } | null;
+  products: { canonical_name: string; brand: string | null } | { canonical_name: string; brand: string | null }[] | null;
 }
 
 interface PurchaseRow {
@@ -19,8 +19,8 @@ interface PurchaseRow {
   unit_price_cents: number;
   total_cents: number;
   purchase_date: string;
-  products: { canonical_name: string; brand: string | null } | null;
-  warehouses: { name: string } | null;
+  products: { canonical_name: string; brand: string | null } | { canonical_name: string; brand: string | null }[] | null;
+  warehouses: { name: string } | { name: string }[] | null;
 }
 
 interface AdjustmentRow {
@@ -34,6 +34,11 @@ interface AdjustmentRow {
 }
 
 type Section = 'watching' | 'purchases' | 'adjustments' | 'deals';
+
+function firstObj<T>(v: T | T[] | null | undefined): T | null {
+  if (v == null) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
 
 export function SavedPage(): JSX.Element {
   const [section, setSection] = useState<Section>('watching');
@@ -51,8 +56,8 @@ export function SavedPage(): JSX.Element {
       supabase().from('adjustment_candidates').select('id, purchase_id, potential_savings_cents, days_remaining, status, new_price_cents, purchase_price_cents').order('days_remaining', { ascending: false }).limit(20),
     ]).then(([w, p, a]) => {
       if (cancelled) return;
-      setWatches((w.data ?? []) as WatchRow[]);
-      setPurchases((p.data ?? []) as PurchaseRow[]);
+      setWatches((w.data ?? []) as unknown as WatchRow[]);
+      setPurchases((p.data ?? []) as unknown as PurchaseRow[]);
       setAdjustments((a.data ?? []) as AdjustmentRow[]);
       setLoading(false);
     });
@@ -91,7 +96,7 @@ export function SavedPage(): JSX.Element {
                 <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {watches.map((w) => (
                     <li key={w.id} className="cs-card">
-                      <div className="cs-strong">{w.products?.canonical_name ?? 'Unknown'}</div>
+                      <div className="cs-strong">{firstObj(w.products)?.canonical_name ?? 'Unknown'}</div>
                       <div className="cs-muted">
                         {w.notify_any_drop && <span className="cs-pill">any drop</span>}
                         {w.notify_clearance && <span className="cs-pill cs-pill--clearance">.97</span>}
@@ -115,9 +120,9 @@ export function SavedPage(): JSX.Element {
                 <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {purchases.map((p) => (
                     <li key={p.id} className="cs-card">
-                      <div className="cs-strong">{p.products?.canonical_name ?? 'Unknown'}</div>
+                      <div className="cs-strong">{firstObj(p.products)?.canonical_name ?? 'Unknown'}</div>
                       <div className="cs-muted">
-                        {p.warehouses?.name} · {new Date(p.purchase_date).toLocaleDateString()}
+                        {firstObj(p.warehouses)?.name} · {new Date(p.purchase_date).toLocaleDateString()}
                       </div>
                     </li>
                   ))}
@@ -148,7 +153,7 @@ export function SavedPage(): JSX.Element {
 
           {!loading && section === 'deals' && (
             <div className="cs-empty">
-              <p>You haven't saved any deals yet.</p>
+              <p>You haven&apos;t saved any deals yet.</p>
               <p className="cs-muted">Open a deal on the Deals tab to save it for later.</p>
             </div>
           )}

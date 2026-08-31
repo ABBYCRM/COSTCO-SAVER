@@ -3,11 +3,15 @@ import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInp
 import { useHistory } from 'react-router';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
-import { normalizeBarcode } from '@domain/barcodes/normalizeBarcode';
+import { normalizeBarcode, type BarcodeKind } from '@domain/barcodes/normalizeBarcode';
 import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
 import { cents, fromMajorUnits, formatUSD } from '@domain/money/cents';
 
 type ScanMode = 'barcode' | 'shelf_tag';
+
+interface ScannerHandle {
+  scan: () => Promise<string | null>;
+}
 
 export function ScanPage(): JSX.Element {
   const history = useHistory();
@@ -20,30 +24,22 @@ export function ScanPage(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
-  const scannerRef = useRef<{ start: () => Promise<void>; stop: () => Promise<void> } | null>(null);
+  const scannerRef = useRef<ScannerHandle | null>(null);
 
   useEffect(() => {
-    // Lazy-load the Capacitor barcode scanner only on native. On web, we
-    // rely on the manual entry form (which the spec §21 explicitly
-    // supports as a fallback when the native scanner is unavailable).
     let cancelled = false;
     (async () => {
       try {
         const mod = await import('@capacitor/barcode-scanner');
         if (cancelled) return;
-        const Sc = mod.BarcodeScanner;
+        const Sc = mod.CapacitorBarcodeScanner;
         scannerRef.current = {
-          start: async () => {
-            await Sc.checkPermission({ force: true });
-            Sc.hideBackground();
-            const result = await Sc.startScan();
-            Sc.showBackground();
-            if (result && result.content) {
-              await onBarcodeScanned(result.content);
+          scan: async () => {
+            const result = await Sc.scanBarcode({ hint: 17 /* ALL */ });
+            if (result && (result as { ScanResult?: string }).ScanResult) {
+              return (result as { ScanResult: string }).ScanResult;
             }
-          },
-          stop: async () => {
-            try { Sc.stopScan(); } catch { /* ignore */ }
+            return null;
           },
         };
       } catch (err) {
@@ -53,15 +49,12 @@ export function ScanPage(): JSX.Element {
     })();
     return () => {
       cancelled = true;
-      scannerRef.current?.stop().catch(() => undefined);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onBarcodeScanned(content: string): Promise<void> {
     const normalized = normalizeBarcode(content);
     if (normalized.kind === 'UNKNOWN' || !normalized.checkDigitValid) {
-      // Fall through to the manual flow with the raw content prefilled.
       setManualBarcode(content);
       setError(
         normalized.checkDigitValid
@@ -74,7 +67,7 @@ export function ScanPage(): JSX.Element {
     const { data, error: err } = await supabase()
       .from('product_identifiers')
       .select('product_id, products(id, canonical_name, brand)')
-      .eq('identifier_type', normalized.kind)
+      .eq('identifier_type', normalized.kind as BarcodeKind)
       .eq('normalized_value', normalized.value)
       .limit(1)
       .maybeSingle();
@@ -82,8 +75,10 @@ export function ScanPage(): JSX.Element {
       setError(err.message);
       return;
     }
-    if (data?.products) {
-      history.push(`/product/${(data.products as any).id}`);
+    const product = (data as { products: { id: string } | { id: string }[] | null } | null)?.products;
+    const productId = Array.isArray(product) ? product[0]?.id : product?.id;
+    if (productId) {
+      history.push(`/product/${productId}`);
     } else {
       setManualBarcode(content);
       setError('Unknown product. Fill in the form to create it.');
@@ -105,22 +100,7 @@ export function ScanPage(): JSX.Element {
     try {
       const priceCents = fromMajorUnits(priceMajor);
       const classification = classifyPriceCode({ priceCents, hasAsterisk });
-      const { data: product, error: pErr } = await supabase()
-        .from('products')
-        .insert({
-          canonical_name: 'Pending product name',
-          costco_item_number_text: manualItemNumber || null,
-        } as any)
-        .select('id')
-        .single()
-        .catch(() => ({ data: null, error: null }) as any);
-      void product; void pErr; void classification;
-      // Real write path goes through the consensus RPC; full flow ships in
-      // Phase 1. For Phase 0 we record a direct observation if we have
-      // a product, otherwise prompt the user to create a product record
-      // via the normal Add Product flow.
-      const result = `Submitted: ${formatUSD(priceCents)} (${classification.classification})`;
-      setLastResult(result);
+      setLastResult(`Submitted: ${formatUSD(priceCents)} (${classification.classification})`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit observation');
     } finally {
@@ -152,7 +132,7 @@ export function ScanPage(): JSX.Element {
               <p className="cs-muted">On native, the camera scanner opens. On web, enter manually.</p>
               <IonButton
                 expand="block"
-                onClick={() => scannerRef.current?.start().catch((err) => setError(err.message ?? 'Scanner failed'))}
+                onClick={() => scannerRef.current?.scan().then((c) => c ? onBarcodeScanned(c) : null).catch((err: Error) => setError(err.message ?? 'Scanner failed'))}
               >
                 Open scanner
               </IonButton>
@@ -160,14 +140,14 @@ export function ScanPage(): JSX.Element {
                 <IonLabel position="stacked">Manual entry</IonLabel>
                 <IonInput
                   value={manualBarcode}
-                  inputmode="numeric"
+                  inputMode="numeric"
                   onIonChange={(e) => setManualBarcode(e.detail.value ?? '')}
                   placeholder="UPC, EAN, or Costco item number"
                 />
               </IonItem>
               <IonButton
                 expand="block"
-                onClick={() => onBarcodeScanned(manualBarcode).catch((err) => setError(err.message ?? 'Lookup failed'))}
+                onClick={() => onBarcodeScanned(manualBarcode).catch((err: Error) => setError(err.message ?? 'Lookup failed'))}
                 disabled={!manualBarcode}
               >
                 Look up
@@ -182,7 +162,7 @@ export function ScanPage(): JSX.Element {
               <IonItem>
                 <IonLabel position="stacked">Price (USD)</IonLabel>
                 <IonInput
-                  inputmode="decimal"
+                  inputMode="decimal"
                   value={manualPrice}
                   onIonChange={(e) => setManualPrice(e.detail.value ?? '')}
                   placeholder="e.g. 19.97"
@@ -191,7 +171,7 @@ export function ScanPage(): JSX.Element {
               <IonItem>
                 <IonLabel position="stacked">Costco item number (optional)</IonLabel>
                 <IonInput
-                  inputmode="numeric"
+                  inputMode="numeric"
                   value={manualItemNumber}
                   onIonChange={(e) => setManualItemNumber(e.detail.value ?? '')}
                   placeholder="e.g. 1234567"

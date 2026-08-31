@@ -11,8 +11,13 @@ describe('health / warehouseHealth', () => {
       evidenceRatio: 0,
       dailyVerificationVolume7d: 0,
     });
-    expect(r.score).toBe(0);
+    // When no data exists, freshness is maxed (no age to penalize) but
+    // coverage / contributors / volume are 0, so the score reflects "we
+    // have no data yet" rather than fabricating activity.
     expect(r.label).toBe('Building coverage');
+    expect(r.components.coverage).toBe(0);
+    expect(r.components.contributor).toBe(0);
+    expect(r.components.volume).toBe(0);
   });
 
   it('labels Excellent when score >= 80', () => {

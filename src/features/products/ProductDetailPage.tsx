@@ -3,9 +3,10 @@ import { useParams } from 'react-router';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonBackButton, IonButtons } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
-import { formatUSD } from '@domain/money/cents';
+import { formatUSD, cents } from '@domain/money/cents';
 import { ageDescription, classifyFreshness } from '@domain/freshness/freshnessEngine';
 import { computeDealScore } from '@domain/deals/dealScore';
+import type { MarkdownClassification } from '@domain/pricing/priceCodeEngine';
 import { confidenceLabel } from '@domain/confidence/confidenceEngine';
 
 interface ProductRow {
@@ -24,6 +25,8 @@ interface StateRow {
   independent_confirmation_count: number;
   freshness_class: string;
 }
+
+type FreshnessClassName = 'LIVE' | 'FRESH' | 'RECENT' | 'AGING' | 'HISTORICAL';
 
 export function ProductDetailPage(): JSX.Element {
   const { productId } = useParams<{ productId: string }>();
@@ -44,13 +47,13 @@ export function ProductDetailPage(): JSX.Element {
               .eq('product_id', productId)
               .eq('warehouse_id', selected.id)
               .maybeSingle()
-          : Promise.resolve({ data: null, error: null } as any),
+          : Promise.resolve({ data: null, error: null } as { data: StateRow | null; error: null }),
       ]);
       if (cancelled) return;
       if (pErr) setError(pErr.message);
       if (sErr) setError(sErr.message);
-      setProduct((p as ProductRow) ?? null);
-      setState((s as StateRow) ?? null);
+      setProduct((p as ProductRow | null) ?? null);
+      setState((s as StateRow | null) ?? null);
     })();
     return () => {
       cancelled = true;
@@ -83,7 +86,7 @@ export function ProductDetailPage(): JSX.Element {
               <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                 <div>
                   <div className="cs-price" style={{ fontSize: 'var(--cs-font-size-7)', fontWeight: 700 }}>
-                    {formatUSD(state.consensus_price_cents as any)}
+                    {formatUSD(cents(state.consensus_price_cents))}
                   </div>
                   <div className="cs-muted">{selected.name}</div>
                 </div>
@@ -127,7 +130,7 @@ export function ProductDetailPage(): JSX.Element {
                 cents={state.consensus_price_cents}
                 markdown={state.markdown_class}
                 confidence={state.confidence_score}
-                freshness={classifyFreshness(state.last_verified_at) as any}
+                freshness={classifyFreshness(state.last_verified_at) as FreshnessClassName}
               />
             </section>
           )}
@@ -141,11 +144,11 @@ function DealBreakdown({ cents, markdown, confidence, freshness }: {
   cents: number;
   markdown: string | null;
   confidence: number;
-  freshness: 'LIVE' | 'FRESH' | 'RECENT' | 'AGING' | 'HISTORICAL';
+  freshness: FreshnessClassName;
 }): JSX.Element {
   const score = computeDealScore({
     currentPrice: cents,
-    markdownClass: markdown as any,
+    markdownClass: (markdown as MarkdownClassification | null) ?? null,
     confidence,
     freshnessClass: freshness,
     currentWarehousePrice: cents,

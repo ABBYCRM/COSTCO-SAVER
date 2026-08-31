@@ -4,7 +4,18 @@ import { supabase } from '@services/supabase/client';
 import { listWarehouses, type WarehouseRow } from '@services/api/warehouses';
 import { useWarehouse } from '@stores/warehouse';
 import { WarehousePicker } from '@features/warehouses/WarehousePicker';
-import { formatUSD } from '@domain/money/cents';
+import { formatUSD, cents } from '@domain/money/cents';
+import { first, type MaybeArray } from '@services/api/joins';
+
+interface DropResponse {
+  product_id: string;
+  warehouse_id: string;
+  old_price_cents: number | null;
+  new_price_cents: number;
+  effective_at: string;
+  products: MaybeArray<{ canonical_name: string; brand: string | null }>;
+  warehouses: MaybeArray<{ name: string }>;
+}
 
 interface DropRow {
   product_id: string;
@@ -56,18 +67,22 @@ export function HomePage(): JSX.Element {
           setLoadingDrops(false);
           return;
         }
-        const rows: DropRow[] = (data ?? []).map((d: any) => ({
-          product_id: d.product_id,
-          product_name: d.products?.canonical_name ?? 'Unknown product',
-          brand: d.products?.brand ?? null,
-          warehouse_id: d.warehouse_id,
-          warehouse_name: d.warehouses?.name ?? selected.name,
-          old_price_cents: d.old_price_cents ?? 0,
-          new_price_cents: d.new_price_cents,
-          effective_at: d.effective_at,
-          markdown_class: null,
-          freshness_class: 'RECENT',
-        }));
+        const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
+          const p = first(d.products);
+          const w = first(d.warehouses);
+          return {
+            product_id: d.product_id,
+            product_name: p?.canonical_name ?? 'Unknown product',
+            brand: p?.brand ?? null,
+            warehouse_id: d.warehouse_id,
+            warehouse_name: w?.name ?? selected.name,
+            old_price_cents: d.old_price_cents ?? 0,
+            new_price_cents: d.new_price_cents,
+            effective_at: d.effective_at,
+            markdown_class: null,
+            freshness_class: 'RECENT',
+          };
+        });
         setDrops(rows);
         setLoadingDrops(false);
       });
@@ -86,18 +101,22 @@ export function HomePage(): JSX.Element {
       .order('effective_at', { ascending: false })
       .limit(20);
     if (!err) {
-      const rows: DropRow[] = (data ?? []).map((d: any) => ({
-        product_id: d.product_id,
-        product_name: d.products?.canonical_name ?? 'Unknown product',
-        brand: d.products?.brand ?? null,
-        warehouse_id: d.warehouse_id,
-        warehouse_name: d.warehouses?.name ?? selected.name,
-        old_price_cents: d.old_price_cents ?? 0,
-        new_price_cents: d.new_price_cents,
-        effective_at: d.effective_at,
-        markdown_class: null,
-        freshness_class: 'RECENT',
-      }));
+      const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
+        const p = first(d.products);
+        const w = first(d.warehouses);
+        return {
+          product_id: d.product_id,
+          product_name: p?.canonical_name ?? 'Unknown product',
+          brand: p?.brand ?? null,
+          warehouse_id: d.warehouse_id,
+          warehouse_name: w?.name ?? selected.name,
+          old_price_cents: d.old_price_cents ?? 0,
+          new_price_cents: d.new_price_cents,
+          effective_at: d.effective_at,
+          markdown_class: null,
+          freshness_class: 'RECENT',
+        };
+      });
       setDrops(rows);
     }
     (event?.detail as { complete?: () => void } | undefined)?.complete?.();
@@ -150,12 +169,12 @@ export function HomePage(): JSX.Element {
                       {d.brand && <div className="cs-muted">{d.brand}</div>}
                     </div>
                     <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
-                      {formatUSD(d.new_price_cents as any)}
+                      {formatUSD(cents(d.new_price_cents))}
                     </div>
                   </div>
                   {d.old_price_cents > 0 && (
                     <div className="cs-muted cs-price" style={{ marginTop: 'var(--cs-space-1)' }}>
-                      was {formatUSD(d.old_price_cents as any)}
+                      was {formatUSD(cents(d.old_price_cents))}
                     </div>
                   )}
                 </li>

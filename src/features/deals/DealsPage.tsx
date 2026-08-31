@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonChip, IonLabel } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
-import { formatUSD } from '@domain/money/cents';
+import { formatUSD, cents } from '@domain/money/cents';
 import { computeDealScore } from '@domain/deals/dealScore';
 import { classifyFreshness } from '@domain/freshness/freshnessEngine';
+import { first, type MaybeArray } from '@services/api/joins';
+import type { MarkdownClassification } from '@domain/pricing/priceCodeEngine';
+import type { FreshnessClass } from '@domain/freshness/freshnessEngine';
 
 interface DealRow {
   product_id: string;
@@ -16,6 +19,17 @@ interface DealRow {
   freshness_class: string;
   confidence_score: number;
   last_verified_at: string | null;
+}
+
+interface DealResponse {
+  product_id: string;
+  warehouse_id: string;
+  consensus_price_cents: number | null;
+  markdown_class: string | null;
+  freshness_class: string;
+  confidence_score: number;
+  last_verified_at: string | null;
+  products: MaybeArray<{ canonical_name: string; brand: string | null }>;
 }
 
 export function DealsPage(): JSX.Element {
@@ -44,17 +58,20 @@ export function DealsPage(): JSX.Element {
           setLoading(false);
           return;
         }
-        const rows: DealRow[] = (data ?? []).map((d: any) => ({
-          product_id: d.product_id,
-          warehouse_id: d.warehouse_id,
-          product_name: d.products?.canonical_name ?? 'Unknown product',
-          brand: d.products?.brand ?? null,
-          consensus_price_cents: d.consensus_price_cents,
-          markdown_class: d.markdown_class,
-          freshness_class: d.freshness_class,
-          confidence_score: d.confidence_score,
-          last_verified_at: d.last_verified_at,
-        }));
+        const rows: DealRow[] = (data ?? []).map((d: DealResponse) => {
+          const p = first(d.products);
+          return {
+            product_id: d.product_id,
+            warehouse_id: d.warehouse_id,
+            product_name: p?.canonical_name ?? 'Unknown product',
+            brand: p?.brand ?? null,
+            consensus_price_cents: d.consensus_price_cents,
+            markdown_class: d.markdown_class,
+            freshness_class: d.freshness_class,
+            confidence_score: d.confidence_score,
+            last_verified_at: d.last_verified_at,
+          };
+        });
         setDeals(rows);
         setLoading(false);
       });
@@ -120,9 +137,9 @@ export function DealsPage(): JSX.Element {
             {filtered.map((d) => {
               const score = computeDealScore({
                 currentPrice: d.consensus_price_cents ?? 0,
-                markdownClass: d.markdown_class as any,
+                markdownClass: (d.markdown_class as MarkdownClassification | null) ?? null,
                 confidence: d.confidence_score,
-                freshnessClass: (d.freshness_class as any) ?? classifyFreshness(d.last_verified_at),
+                freshnessClass: (d.freshness_class as FreshnessClass) ?? classifyFreshness(d.last_verified_at),
                 currentWarehousePrice: d.consensus_price_cents ?? 0,
               });
               return (
@@ -137,7 +154,7 @@ export function DealsPage(): JSX.Element {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
-                        {d.consensus_price_cents ? formatUSD(d.consensus_price_cents as any) : '—'}
+                        {d.consensus_price_cents ? formatUSD(cents(d.consensus_price_cents)) : '—'}
                       </div>
                       <div className="cs-muted">{score.rating} · {score.score}</div>
                     </div>

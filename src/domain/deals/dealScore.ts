@@ -13,8 +13,8 @@
  */
 
 import type { Cents } from '@domain/money/cents';
-import { percentChange, type MarkdownClassification } from '@domain/money/cents';
-import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
+import { percentChange } from '@domain/money/cents';
+import { classifyPriceCode, type MarkdownClassification } from '@domain/pricing/priceCodeEngine';
 import type { FreshnessClass } from '@domain/freshness/freshnessEngine';
 
 export interface DealScoreInput {

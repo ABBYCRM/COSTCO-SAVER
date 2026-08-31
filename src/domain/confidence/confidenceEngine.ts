@@ -58,21 +58,21 @@ export function confidenceScore(input: ConfidenceInput): number {
   // Independent confirmations
   const confirmations = Math.max(0, Math.floor(input.independentConfirmationCount));
   if (confirmations > 0) {
-    score += CONFIRMATION_POINTS[0];
+    score += CONFIRMATION_POINTS[0] ?? 0;
   }
   if (confirmations > 1) {
-    score += CONFIRMATION_POINTS[1];
+    score += CONFIRMATION_POINTS[1] ?? 0;
   }
   if (confirmations > 2) {
-    score += CONFIRMATION_POINTS[2];
+    score += CONFIRMATION_POINTS[2] ?? 0;
   }
   if (confirmations > 3) {
     score += Math.min(confirmations - 3, 0) + ADDITIONAL_CONFIRMATION_POINTS * (confirmations - 3);
     // Cap at +25 from confirmations.
     const confirmTotal =
-      CONFIRMATION_POINTS[0] +
-      CONFIRMATION_POINTS[1] +
-      CONFIRMATION_POINTS[2] +
+      (CONFIRMATION_POINTS[0] ?? 0) +
+      (CONFIRMATION_POINTS[1] ?? 0) +
+      (CONFIRMATION_POINTS[2] ?? 0) +
       ADDITIONAL_CONFIRMATION_POINTS * (confirmations - 3);
     score -= Math.max(0, confirmTotal - CONFIRMATION_CAP);
   }
