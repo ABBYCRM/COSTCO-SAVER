@@ -33,7 +33,7 @@ the order prescribed by §98. Each phase has its own PR.
 | 26 | Shopping list | **schema shipped** | UI lands in Phase 2 |
 | 27 | Trip Mode | **partial** | shopping list infra; trip calc lands in Phase 2 |
 | 28 | Offline sync | **partial** | zustand-persisted warehouse + outbox table TBD in Phase 2 |
-| 29 | Moderator console | **not started** | Phase 3 — separate `admin/` bundle |
+| 29 | Moderator console | **scaffold shipped** | `admin-scaffold/` is the separate bundle; Phase 3 will add full queue actions via Edge Functions |
 | 30 | Anti-abuse | **partial** | device_session_hash + idempotency key in schema |
 | 31 | Accessibility | **partial** | token-driven; full WCAG pass in Phase 3 |
 | 32 | Full E2E | **partial** | auth + isolation specs; full matrix in Phase 3 |
