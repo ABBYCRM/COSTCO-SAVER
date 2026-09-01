@@ -342,6 +342,34 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE TRIGGER reports_updated_at BEFORE UPDATE ON reports
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+CREATE TABLE IF NOT EXISTS moderation_actions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  moderator_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action text NOT NULL,
+  entity_type text NOT NULL,
+  entity_id uuid,
+  reason text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_moderation_actions_created ON moderation_actions(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS shopping_list_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  quantity numeric(10,3) NOT NULL DEFAULT 1 CHECK(quantity > 0),
+  note text,
+  preferred_warehouse_id uuid REFERENCES warehouses(id) ON DELETE SET NULL,
+  checked boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_shopping_list_user ON shopping_list_items(user_id, checked, created_at);
+CREATE TRIGGER shopping_list_updated_at BEFORE UPDATE ON shopping_list_items
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 CREATE TABLE IF NOT EXISTS audit_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -358,7 +386,7 @@ DECLARE
   table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
-    'user_warehouses','receipts','purchases','watches','saved_deals','adjustment_candidates',
+    'user_warehouses','receipts','purchases','watches','saved_deals','shopping_list_items','adjustment_candidates',
     'notifications','device_tokens'
   ]
   LOOP
