@@ -37,3 +37,10 @@ export async function transaction(fn) {
     client.release();
   }
 }
+
+export async function userTransaction(userId, fn) {
+  return transaction(async (client) => {
+    await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+    return fn(client);
+  });
+}
