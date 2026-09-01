@@ -354,7 +354,7 @@ BEGIN
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', table_name);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', table_name);
     EXECUTE format(
-      'CREATE POLICY %I_owner ON %I USING (user_id = nullif(current_setting(''app.user_id'', true), '''')::uuid) WITH CHECK (user_id = nullif(current_setting(''app.user_id'', true), '''')::uuid)',
+      'CREATE POLICY %I_owner ON %I USING (current_setting(''app.internal'', true) = ''true'' OR user_id = nullif(current_setting(''app.user_id'', true), '''')::uuid) WITH CHECK (current_setting(''app.internal'', true) = ''true'' OR user_id = nullif(current_setting(''app.user_id'', true), '''')::uuid)',
       table_name, table_name
     );
   END LOOP;
@@ -363,27 +363,29 @@ END $$;
 ALTER TABLE refresh_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
 CREATE POLICY refresh_tokens_owner ON refresh_tokens
-USING (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
-WITH CHECK (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
+USING (current_setting('app.internal', true) = 'true' OR user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+WITH CHECK (current_setting('app.internal', true) = 'true' OR user_id = nullif(current_setting('app.user_id', true), '')::uuid);
 
 ALTER TABLE evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence FORCE ROW LEVEL SECURITY;
 CREATE POLICY evidence_owner ON evidence
-USING (owner_user_id = nullif(current_setting('app.user_id', true), '')::uuid)
-WITH CHECK (owner_user_id = nullif(current_setting('app.user_id', true), '')::uuid);
+USING (current_setting('app.internal', true) = 'true' OR owner_user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+WITH CHECK (current_setting('app.internal', true) = 'true' OR owner_user_id = nullif(current_setting('app.user_id', true), '')::uuid);
 
 ALTER TABLE receipt_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE receipt_lines FORCE ROW LEVEL SECURITY;
 CREATE POLICY receipt_lines_owner ON receipt_lines
 USING (
-  EXISTS (
+  current_setting('app.internal', true) = 'true'
+  OR EXISTS (
     SELECT 1 FROM receipts r
     WHERE r.id = receipt_lines.receipt_id
       AND r.user_id = nullif(current_setting('app.user_id', true), '')::uuid
   )
 )
 WITH CHECK (
-  EXISTS (
+  current_setting('app.internal', true) = 'true'
+  OR EXISTS (
     SELECT 1 FROM receipts r
     WHERE r.id = receipt_lines.receipt_id
       AND r.user_id = nullif(current_setting('app.user_id', true), '')::uuid
