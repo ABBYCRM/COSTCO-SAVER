@@ -1,4 +1,4 @@
-import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonTabs, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Redirect, Route } from 'react-router';
 import { HomePage } from '@features/home/HomePage';
@@ -30,9 +30,8 @@ export function App(): JSX.Element {
     <IonApp>
       <IonReactRouter>
         <AuthGate>
-          <IonSplitPane contentId="main">
-            <AppShell />
-            <IonRouterOutlet id="main">
+          <IonTabs>
+            <IonRouterOutlet>
               <Route exact path="/" render={() => <Redirect to="/home" />} />
               <Route exact path="/home" component={HomePage} />
               <Route exact path="/deals" component={DealsPage} />
@@ -43,7 +42,8 @@ export function App(): JSX.Element {
               <Route exact path="/product/:productId/buy" component={BuyItPage} />
               <Route exact path="/search" component={SearchPage} />
             </IonRouterOutlet>
-          </IonSplitPane>
+            <AppShell />
+          </IonTabs>
         </AuthGate>
       </IonReactRouter>
     </IonApp>
