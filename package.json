@@ -23,7 +23,8 @@
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",
     "cap:open:android": "cap open android",
-    "no-stub-scan": "node scripts/no-stub-scan.mjs"
+    "no-stub-scan": "node scripts/no-stub-scan.mjs",
+    "db:seed:test": "node server/seed.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
