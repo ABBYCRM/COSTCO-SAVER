@@ -10,19 +10,13 @@
  *  - reject obviously bad input
  */
 
-export type BarcodeKind =
-  | 'UPC_A'
-  | 'UPC_E'
-  | 'EAN_8'
-  | 'EAN_13'
-  | 'GTIN_14'
-  | 'UNKNOWN';
+export type BarcodeKind = 'UPC_A' | 'UPC_E' | 'EAN_8' | 'EAN_13' | 'GTIN_14' | 'UNKNOWN';
 
 export interface NormalizedBarcode {
-  readonly value: string;       // canonical form
+  readonly value: string; // canonical form
   readonly kind: BarcodeKind;
   readonly checkDigitValid: boolean;
-  readonly display: string;     // what the UI shows
+  readonly display: string; // what the UI shows
 }
 
 const ALLOWED = /^\d+$/;
@@ -97,7 +91,7 @@ export function expandUpcEtoUpcA(upce: string): string | null {
   const d = upce[2]!;
   const last = upce[5]!;
   const abc = upce.slice(1, 4); // bcd
-  const de = upce.slice(4, 6);  // e0..e9 (we treat upce[2] specially)
+  const de = upce.slice(4, 6); // e0..e9 (we treat upce[2] specially)
   let upca: string;
   if (last === '0' || last === '1' || last === '2') {
     upca = `0${abc}${last}000${de[0]}`;

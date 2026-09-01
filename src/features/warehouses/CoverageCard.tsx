@@ -43,7 +43,9 @@ export function CoverageCard({ warehouseId }: CoverageCardProps): JSX.Element {
   if (loading) {
     return (
       <section className="cs-card" aria-busy="true">
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage</h3>
+        <h3 className="cs-strong" style={{ margin: 0 }}>
+          Coverage
+        </h3>
         <p className="cs-muted">Calculating…</p>
       </section>
     );
@@ -52,8 +54,12 @@ export function CoverageCard({ warehouseId }: CoverageCardProps): JSX.Element {
   if (error) {
     return (
       <section className="cs-card">
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage</h3>
-        <p role="alert" className="cs-muted">{error}</p>
+        <h3 className="cs-strong" style={{ margin: 0 }}>
+          Coverage
+        </h3>
+        <p role="alert" className="cs-muted">
+          {error}
+        </p>
       </section>
     );
   }
@@ -62,13 +68,17 @@ export function CoverageCard({ warehouseId }: CoverageCardProps): JSX.Element {
   return (
     <section className="cs-card" aria-label={`Warehouse coverage ${result.label}`}>
       <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage radar</h3>
+        <h3 className="cs-strong" style={{ margin: 0 }}>
+          Coverage radar
+        </h3>
         <span className={`cs-pill cs-pill--${labelToClass(result.label)}`}>{result.label}</span>
       </div>
       <div className="cs-row" style={{ justifyContent: 'space-between', marginTop: 'var(--cs-space-3)' }}>
         <div>
           <div className="cs-muted">Health score</div>
-          <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>{result.score}/100</div>
+          <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
+            {result.score}/100
+          </div>
         </div>
         <div>
           <div className="cs-muted">Products</div>
@@ -82,8 +92,8 @@ export function CoverageCard({ warehouseId }: CoverageCardProps): JSX.Element {
       <p className="cs-muted" style={{ marginTop: 'var(--cs-space-3)' }}>
         {stats.distinctContributorsLast30d} contributors in 30 days ·{' '}
         {stats.dailyVerificationVolume7d.toFixed(1)} verifications/day ·{' '}
-        {(stats.conflictRatio * 100).toFixed(1)}% conflict ·{' '}
-        {(stats.evidenceRatio * 100).toFixed(1)}% evidence-backed
+        {(stats.conflictRatio * 100).toFixed(1)}% conflict · {(stats.evidenceRatio * 100).toFixed(1)}%
+        evidence-backed
       </p>
     </section>
   );

@@ -15,11 +15,7 @@
  */
 
 export type EvidenceSource =
-  | 'shelf_photo'
-  | 'barcode_same_session'
-  | 'costco_item_number'
-  | 'receipt'
-  | 'manual_price_only';
+  'shelf_photo' | 'barcode_same_session' | 'costco_item_number' | 'receipt' | 'manual_price_only';
 
 export interface ConfidenceInput {
   readonly sources: readonly EvidenceSource[];
@@ -27,7 +23,7 @@ export interface ConfidenceInput {
   readonly lastVerifiedAt: Date | string | null;
   readonly contributorReputation: number; // 0..100
   readonly freshConflictCount: number;
-  readonly invalidPenalty?: number;       // 0..100, default 0
+  readonly invalidPenalty?: number; // 0..100, default 0
   readonly now?: Date;
 }
 
@@ -79,9 +75,8 @@ export function confidenceScore(input: ConfidenceInput): number {
 
   // Recency
   if (input.lastVerifiedAt) {
-    const last = typeof input.lastVerifiedAt === 'string'
-      ? new Date(input.lastVerifiedAt)
-      : input.lastVerifiedAt;
+    const last =
+      typeof input.lastVerifiedAt === 'string' ? new Date(input.lastVerifiedAt) : input.lastVerifiedAt;
     if (!Number.isNaN(last.getTime())) {
       const ageMs = now.getTime() - last.getTime();
       if (ageMs <= 6 * 60 * 60 * 1000) score += 20;

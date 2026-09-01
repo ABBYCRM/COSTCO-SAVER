@@ -72,11 +72,7 @@ async function refreshSession(): Promise<boolean> {
   return true;
 }
 
-export async function apiFetch<T>(
-  path: string,
-  init: RequestInit = {},
-  retry = true,
-): Promise<T> {
+export async function apiFetch<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const headers = new Headers(init.headers);
   if (!headers.has('content-type') && init.body) {
     headers.set('content-type', 'application/json');

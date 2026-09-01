@@ -24,7 +24,14 @@ export interface ObservationLike {
   readonly priceCents: number;
   readonly observedAt: Date | string;
   readonly submitterUserId: string;
-  readonly source: 'shelf_scan' | 'manual_shelf_entry' | 'receipt' | 'confirmation' | 'correction' | 'authorized_external_provider' | 'administrator_verified';
+  readonly source:
+    | 'shelf_scan'
+    | 'manual_shelf_entry'
+    | 'receipt'
+    | 'confirmation'
+    | 'correction'
+    | 'authorized_external_provider'
+    | 'administrator_verified';
   readonly hasAsterisk: boolean;
   readonly verificationStatus: 'pending' | 'verified' | 'rejected' | 'flagged';
   readonly evidencePresent: boolean;
@@ -81,7 +88,9 @@ export function computeConsensus(
   now: Date = new Date(),
 ): ConsensusResult {
   // Step 6: filter out rejected / flagged observations.
-  const usable = observations.filter((o) => o.verificationStatus !== 'rejected' && o.verificationStatus !== 'flagged');
+  const usable = observations.filter(
+    (o) => o.verificationStatus !== 'rejected' && o.verificationStatus !== 'flagged',
+  );
 
   if (usable.length === 0) {
     return {
@@ -103,10 +112,7 @@ export function computeConsensus(
     const observedAt = typeof o.observedAt === 'string' ? new Date(o.observedAt) : o.observedAt;
 
     const sourceTypes = EVIDENCE_BASE_FOR_SOURCE[o.source] ?? ['manual_price_only'];
-    const basePoints = sourceTypes.reduce(
-      (acc, st) => acc + evidenceBasePoint(st, o),
-      0,
-    );
+    const basePoints = sourceTypes.reduce((acc, st) => acc + evidenceBasePoint(st, o), 0);
     const recency = recencyWeight(observedAt, now);
     // Step 4: weight by recency; step 3: weight by evidence (already in basePoints)
     const weight = basePoints * recency;
@@ -147,10 +153,7 @@ export function computeConsensus(
 
   // Step 8: confidence from the cluster.
   const totalObservations = clusters.reduce((acc, c) => acc + c.observationIds.size, 0);
-  const evidenceCount = clusters.reduce(
-    (acc, c) => acc + countEvidence(c),
-    0,
-  );
+  const evidenceCount = clusters.reduce((acc, c) => acc + countEvidence(c), 0);
   const conflictingReportCount = totalObservations - winner.observationIds.size;
 
   // Base sources for the winning price: shelf, barcode, item number, receipt.

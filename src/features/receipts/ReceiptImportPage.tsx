@@ -132,11 +132,17 @@ export function ReceiptImportPage(): JSX.Element {
 
   return (
     <IonPage>
-      <IonHeader><IonToolbar><IonTitle>Import Receipt</IonTitle></IonToolbar></IonHeader>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Import Receipt</IonTitle>
+        </IonToolbar>
+      </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
           <section className="cs-card">
-            <h2 className="cs-section-title" style={{ marginTop: 0 }}>Receipt</h2>
+            <h2 className="cs-section-title" style={{ marginTop: 0 }}>
+              Receipt
+            </h2>
             <IonItem>
               <IonLabel position="stacked">Warehouse</IonLabel>
               <select
@@ -174,7 +180,9 @@ export function ReceiptImportPage(): JSX.Element {
           </section>
 
           <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <h2 className="cs-section-title" style={{ marginTop: 0 }}>Purchase lines</h2>
+            <h2 className="cs-section-title" style={{ marginTop: 0 }}>
+              Purchase lines
+            </h2>
             <p className="cs-muted">Match each receipt line to a product and confirm the price you paid.</p>
             <div className="cs-stack">
               {lines.map((line, index) => (
@@ -184,7 +192,9 @@ export function ReceiptImportPage(): JSX.Element {
                     <IonLabel position="stacked">Product name or Costco item number</IonLabel>
                     <IonInput
                       value={line.query}
-                      onIonChange={(event) => patchLine(line.key, { query: event.detail.value ?? '', product: null })}
+                      onIonChange={(event) =>
+                        patchLine(line.key, { query: event.detail.value ?? '', product: null })
+                      }
                     />
                   </IonItem>
                   <IonButton size="small" fill="outline" onClick={() => void searchLine(line)}>
@@ -247,11 +257,18 @@ export function ReceiptImportPage(): JSX.Element {
             <IonButton fill="outline" onClick={() => setLines((current) => [...current, newLine()])}>
               Add line
             </IonButton>
-            <p className="cs-strong">Confirmed total: {'$'}{(totalCents / 100).toFixed(2)}</p>
+            <p className="cs-strong">
+              Confirmed total: {'$'}
+              {(totalCents / 100).toFixed(2)}
+            </p>
             <IonButton expand="block" disabled={busy} onClick={() => void submit()}>
               {busy ? 'Importing…' : 'Confirm receipt'}
             </IonButton>
-            {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+            {error && (
+              <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+                {error}
+              </p>
+            )}
           </section>
         </div>
       </IonContent>

@@ -18,11 +18,7 @@ import { useWarehouse } from '@stores/warehouse';
 import { normalizeBarcode, type BarcodeKind } from '@domain/barcodes/normalizeBarcode';
 import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
 import { cents, fromMajorUnits, formatUSD } from '@domain/money/cents';
-import {
-  createProvisionalProduct,
-  findProductByBarcode,
-  searchProducts,
-} from '@services/api/search';
+import { createProvisionalProduct, findProductByBarcode, searchProducts } from '@services/api/search';
 import { submitShelfObservation } from '@services/api/observations';
 import { uploadEvidence } from '@services/api/media';
 
@@ -122,9 +118,7 @@ export function ScanPage(): JSX.Element {
     const item = manualItemNumber.trim();
     if (!item) return resolvedProduct;
     const hits = await searchProducts(item, 10);
-    const exact = hits.find(
-      (hit) => hit.identifierType === 'COSTCO_ITEM_NUMBER' && hit.identifier === item,
-    );
+    const exact = hits.find((hit) => hit.identifierType === 'COSTCO_ITEM_NUMBER' && hit.identifier === item);
     if (exact) {
       const resolved = { id: exact.productId, label: exact.canonicalName };
       setResolvedProduct(resolved);
@@ -251,7 +245,9 @@ export function ScanPage(): JSX.Element {
 
           {mode === 'barcode' && (
             <section className="cs-card" style={{ marginTop: 'var(--cs-space-4)' }}>
-              <h3 className="cs-strong" style={{ margin: 0 }}>Product barcode</h3>
+              <h3 className="cs-strong" style={{ margin: 0 }}>
+                Product barcode
+              </h3>
               <p className="cs-muted">
                 Use the camera on iOS/Android. Manual entry remains available if camera access is unavailable.
               </p>
@@ -294,14 +290,22 @@ export function ScanPage(): JSX.Element {
 
           {(unknownBarcodeType || (manualBarcode && !resolvedProduct)) && (
             <section className="cs-card" style={{ marginTop: 'var(--cs-space-4)' }}>
-              <h3 className="cs-strong" style={{ margin: 0 }}>Add this product</h3>
+              <h3 className="cs-strong" style={{ margin: 0 }}>
+                Add this product
+              </h3>
               <IonItem>
                 <IonLabel position="stacked">Product name</IonLabel>
-                <IonInput value={newProductName} onIonChange={(e) => setNewProductName(e.detail.value ?? '')} />
+                <IonInput
+                  value={newProductName}
+                  onIonChange={(e) => setNewProductName(e.detail.value ?? '')}
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="stacked">Brand (optional)</IonLabel>
-                <IonInput value={newProductBrand} onIonChange={(e) => setNewProductBrand(e.detail.value ?? '')} />
+                <IonInput
+                  value={newProductBrand}
+                  onIonChange={(e) => setNewProductBrand(e.detail.value ?? '')}
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="stacked">Costco item number (optional)</IonLabel>
@@ -311,7 +315,11 @@ export function ScanPage(): JSX.Element {
                   onIonChange={(e) => setManualItemNumber(e.detail.value ?? '')}
                 />
               </IonItem>
-              <IonButton expand="block" onClick={createUnknownProduct} disabled={busy || !newProductName.trim()}>
+              <IonButton
+                expand="block"
+                onClick={createUnknownProduct}
+                disabled={busy || !newProductName.trim()}
+              >
                 Create product
               </IonButton>
             </section>
@@ -319,7 +327,9 @@ export function ScanPage(): JSX.Element {
 
           {mode === 'shelf_tag' && (
             <section className="cs-card" style={{ marginTop: 'var(--cs-space-4)' }}>
-              <h3 className="cs-strong" style={{ margin: 0 }}>Warehouse shelf price</h3>
+              <h3 className="cs-strong" style={{ margin: 0 }}>
+                Warehouse shelf price
+              </h3>
               <p className="cs-muted">
                 Reporting at <span className="cs-strong">{selected?.name ?? 'no warehouse selected'}</span>.
               </p>
@@ -386,12 +396,26 @@ export function ScanPage(): JSX.Element {
 
           {preview && (
             <p className="cs-muted">
-              Markdown classification: <span className="cs-pill cs-pill--clearance">{preview.classification}</span>
-              {preview.hasAsterisk && <> · <span className="cs-pill cs-pill--aging">asterisk</span></>}
+              Markdown classification:{' '}
+              <span className="cs-pill cs-pill--clearance">{preview.classification}</span>
+              {preview.hasAsterisk && (
+                <>
+                  {' '}
+                  · <span className="cs-pill cs-pill--aging">asterisk</span>
+                </>
+              )}
             </p>
           )}
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-          {lastResult && <p className="cs-strong" role="status">{lastResult}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
+          {lastResult && (
+            <p className="cs-strong" role="status">
+              {lastResult}
+            </p>
+          )}
         </div>
       </IonContent>
     </IonPage>

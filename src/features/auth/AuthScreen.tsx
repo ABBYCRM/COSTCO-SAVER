@@ -62,7 +62,11 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
             {mode === 'signup' && (
               <p className="cs-muted">Use at least 10 characters. Your password is hashed before storage.</p>
             )}
-            {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+            {error && (
+              <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+                {error}
+              </p>
+            )}
             <IonButton type="submit" expand="block" disabled={busy}>
               {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
             </IonButton>

@@ -20,7 +20,13 @@ describe('adjustments / adjustmentEngine', () => {
   it('returns null when lower price is not actually lower', () => {
     const result = evaluateAdjustment(
       purchase,
-      { productId: 'prod1', warehouseId: 'wh1', priceCents: cents(3199), priceDropDate: new Date(), confidence: 90 },
+      {
+        productId: 'prod1',
+        warehouseId: 'wh1',
+        priceCents: cents(3199),
+        priceDropDate: new Date(),
+        confidence: 90,
+      },
       30,
       now,
     );
@@ -30,7 +36,13 @@ describe('adjustments / adjustmentEngine', () => {
   it('returns null when confidence is below threshold', () => {
     const result = evaluateAdjustment(
       purchase,
-      { productId: 'prod1', warehouseId: 'wh1', priceCents: cents(2097), priceDropDate: new Date(), confidence: 30 },
+      {
+        productId: 'prod1',
+        warehouseId: 'wh1',
+        priceCents: cents(2097),
+        priceDropDate: new Date(),
+        confidence: 30,
+      },
       30,
       now,
     );
@@ -40,7 +52,13 @@ describe('adjustments / adjustmentEngine', () => {
   it('creates an opportunity with savings = perUnit * quantity', () => {
     const result = evaluateAdjustment(
       purchase,
-      { productId: 'prod1', warehouseId: 'wh1', priceCents: cents(2097), priceDropDate: new Date(), confidence: 90 },
+      {
+        productId: 'prod1',
+        warehouseId: 'wh1',
+        priceCents: cents(2097),
+        priceDropDate: new Date(),
+        confidence: 90,
+      },
       30,
       now,
     );
@@ -55,7 +73,13 @@ describe('adjustments / adjustmentEngine', () => {
     const oldPurchase = { ...purchase, purchaseDate: new Date('2026-01-01T00:00:00Z') };
     const result = evaluateAdjustment(
       oldPurchase,
-      { productId: 'prod1', warehouseId: 'wh1', priceCents: cents(2097), priceDropDate: new Date(), confidence: 90 },
+      {
+        productId: 'prod1',
+        warehouseId: 'wh1',
+        priceCents: cents(2097),
+        priceDropDate: new Date(),
+        confidence: 90,
+      },
       30,
       now,
     );

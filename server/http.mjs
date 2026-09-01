@@ -62,6 +62,7 @@ export function uuid(value) {
 
 export function cents(value) {
   const n = Number(value);
-  if (!Number.isSafeInteger(n) || n < 0) throw Object.assign(new Error('Invalid money value'), { status: 400 });
+  if (!Number.isSafeInteger(n) || n < 0)
+    throw Object.assign(new Error('Invalid money value'), { status: 400 });
   return n;
 }

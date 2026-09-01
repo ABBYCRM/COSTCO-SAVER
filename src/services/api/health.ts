@@ -19,9 +19,7 @@ interface ApiStats {
 }
 
 export async function getWarehouseHealth(warehouseId: string): Promise<WarehouseHealthStats> {
-  const result = await apiFetch<{ stats: ApiStats }>(
-    `/api/v1/warehouses/${warehouseId}/health`,
-  );
+  const result = await apiFetch<{ stats: ApiStats }>(`/api/v1/warehouses/${warehouseId}/health`);
   return {
     activeObservedProducts: Number(result.stats.active_observed_products || 0),
     medianObservationAgeHours: Number(result.stats.median_observation_age_hours || 0),

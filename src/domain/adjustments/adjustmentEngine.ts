@@ -16,13 +16,7 @@
 import type { Cents } from '@domain/money/cents';
 import { cents, computeSavingsCents, subCents, mulCents } from '@domain/money/cents';
 
-export type AdjustmentStatus =
-  | 'tracking'
-  | 'opportunity'
-  | 'claimed'
-  | 'denied'
-  | 'expired'
-  | 'dismissed';
+export type AdjustmentStatus = 'tracking' | 'opportunity' | 'claimed' | 'denied' | 'expired' | 'dismissed';
 
 export interface ActivePurchase {
   readonly id: string;
@@ -60,12 +54,12 @@ export function evaluateAdjustment(
   if ((lowerPrice.priceCents as number) >= (purchase.unitPriceCents as number)) return null;
   if (lowerPrice.confidence < MIN_CONFIDENCE) return null;
 
-  const purchaseDate = typeof purchase.purchaseDate === 'string'
-    ? new Date(purchase.purchaseDate)
-    : purchase.purchaseDate;
-  const dropDate = typeof lowerPrice.priceDropDate === 'string'
-    ? new Date(lowerPrice.priceDropDate)
-    : lowerPrice.priceDropDate;
+  const purchaseDate =
+    typeof purchase.purchaseDate === 'string' ? new Date(purchase.purchaseDate) : purchase.purchaseDate;
+  const dropDate =
+    typeof lowerPrice.priceDropDate === 'string'
+      ? new Date(lowerPrice.priceDropDate)
+      : lowerPrice.priceDropDate;
   if (Number.isNaN(purchaseDate.getTime()) || Number.isNaN(dropDate.getTime())) return null;
 
   const windowEnd = new Date(purchaseDate.getTime() + windowDays * 24 * 60 * 60 * 1000);

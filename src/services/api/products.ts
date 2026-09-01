@@ -57,10 +57,7 @@ export async function getProduct(
   return apiFetch(`/api/v1/products/${productId}${suffix}`);
 }
 
-export async function getProductHistory(
-  productId: string,
-  warehouseId: string,
-): Promise<PriceObservation[]> {
+export async function getProductHistory(productId: string, warehouseId: string): Promise<PriceObservation[]> {
   const result = await apiFetch<{ observations: PriceObservation[] }>(
     `/api/v1/products/${productId}/history?warehouseId=${encodeURIComponent(warehouseId)}`,
   );

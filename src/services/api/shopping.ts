@@ -22,40 +22,47 @@ export interface TripWarehouse {
 }
 
 export async function listShoppingItems(): Promise<ShoppingItem[]> {
-  const result=await apiFetch<{items:ShoppingItem[]}>('/api/v1/shopping-list');
+  const result = await apiFetch<{ items: ShoppingItem[] }>('/api/v1/shopping-list');
   return result.items;
 }
 
-export async function saveShoppingItem(input:{
-  productId:string;
-  quantity?:number;
-  note?:string|null;
-  preferredWarehouseId?:string|null;
-}):Promise<ShoppingItem>{
-  const result=await apiFetch<{item:ShoppingItem}>('/api/v1/shopping-list',{
-    method:'POST',body:JSON.stringify(input)
+export async function saveShoppingItem(input: {
+  productId: string;
+  quantity?: number;
+  note?: string | null;
+  preferredWarehouseId?: string | null;
+}): Promise<ShoppingItem> {
+  const result = await apiFetch<{ item: ShoppingItem }>('/api/v1/shopping-list', {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
   return result.item;
 }
 
-export async function updateShoppingItem(id:string,input:{
-  checked?:boolean;
-  quantity?:number;
-  note?:string|null;
-}):Promise<ShoppingItem>{
-  const result=await apiFetch<{item:ShoppingItem}>(`/api/v1/shopping-list/${id}`,{
-    method:'PATCH',body:JSON.stringify(input)
+export async function updateShoppingItem(
+  id: string,
+  input: {
+    checked?: boolean;
+    quantity?: number;
+    note?: string | null;
+  },
+): Promise<ShoppingItem> {
+  const result = await apiFetch<{ item: ShoppingItem }>(`/api/v1/shopping-list/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   });
   return result.item;
 }
 
-export async function deleteShoppingItem(id:string):Promise<void>{
-  await apiFetch(`/api/v1/shopping-list/${id}`,{method:'DELETE'});
+export async function deleteShoppingItem(id: string): Promise<void> {
+  await apiFetch(`/api/v1/shopping-list/${id}`, { method: 'DELETE' });
 }
 
-export async function compareTrip(warehouseIds:string[]):Promise<TripWarehouse[]>{
-  const params=new URLSearchParams();
-  for(const id of warehouseIds) params.append('warehouseId',id);
-  const result=await apiFetch<{warehouses:TripWarehouse[]}>(`/api/v1/trip-comparison?${params.toString()}`);
+export async function compareTrip(warehouseIds: string[]): Promise<TripWarehouse[]> {
+  const params = new URLSearchParams();
+  for (const id of warehouseIds) params.append('warehouseId', id);
+  const result = await apiFetch<{ warehouses: TripWarehouse[] }>(
+    `/api/v1/trip-comparison?${params.toString()}`,
+  );
   return result.warehouses;
 }

@@ -14,16 +14,8 @@ import { useHistory } from 'react-router';
 import { useWarehouse } from '@stores/warehouse';
 import { listWatches, deleteWatch, type WatchRow } from '@services/api/watches';
 import { listPurchases, deletePurchase, type PurchaseRow } from '@services/api/purchases';
-import {
-  listAdjustments,
-  setAdjustmentStatus,
-  type AdjustmentRow,
-} from '@services/api/adjustments';
-import {
-  listSavedDeals,
-  deleteSavedDeal,
-  type SavedDealRow,
-} from '@services/api/savedDeals';
+import { listAdjustments, setAdjustmentStatus, type AdjustmentRow } from '@services/api/adjustments';
+import { listSavedDeals, deleteSavedDeal, type SavedDealRow } from '@services/api/savedDeals';
 import { formatUSD, cents } from '@domain/money/cents';
 
 type Section = 'watching' | 'purchases' | 'adjustments' | 'deals';
@@ -129,25 +121,42 @@ export function SavedPage(): JSX.Element {
       <IonContent fullscreen>
         <div className="cs-page">
           <div className="cs-row" style={{ marginBottom: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
-            <IonButton size="small" fill="outline" onClick={() => history.push('/receipts/import')}>Import receipt</IonButton>
-            <IonButton size="small" fill="outline" onClick={() => history.push('/trip')}>Trip Mode</IonButton>
+            <IonButton size="small" fill="outline" onClick={() => history.push('/receipts/import')}>
+              Import receipt
+            </IonButton>
+            <IonButton size="small" fill="outline" onClick={() => history.push('/trip')}>
+              Trip Mode
+            </IonButton>
           </div>
           <IonSegment value={section} onIonChange={(e) => setSection(e.detail.value as Section)}>
-            <IonSegmentButton value="watching"><IonLabel>Watching</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="purchases"><IonLabel>Purchases</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="adjustments"><IonLabel>Adjustments</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="deals"><IonLabel>Deals</IonLabel></IonSegmentButton>
+            <IonSegmentButton value="watching">
+              <IonLabel>Watching</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="purchases">
+              <IonLabel>Purchases</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="adjustments">
+              <IonLabel>Adjustments</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="deals">
+              <IonLabel>Deals</IonLabel>
+            </IonSegmentButton>
           </IonSegment>
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
           {loading && (
             <div className="cs-card cs-stack" aria-busy="true">
               <div className="cs-skeleton" style={{ width: '60%' }} />
             </div>
           )}
 
-          {!loading && section === 'watching' && (
-            watches.length === 0 ? (
+          {!loading &&
+            section === 'watching' &&
+            (watches.length === 0 ? (
               <div className="cs-empty">
                 <p>You are not watching any products.</p>
                 <IonButton onClick={() => history.push('/search')}>Find a product</IonButton>
@@ -179,17 +188,19 @@ export function SavedPage(): JSX.Element {
                       )}
                       {watch.notify_any_drop && <span className="cs-pill">any drop</span>}
                       {watch.notify_clearance && <span className="cs-pill cs-pill--clearance">.97</span>}
-                      {watch.notify_manager_markdown && <span className="cs-pill cs-pill--aging">manager</span>}
+                      {watch.notify_manager_markdown && (
+                        <span className="cs-pill cs-pill--aging">manager</span>
+                      )}
                       {watch.notify_asterisk && <span className="cs-pill">asterisk</span>}
                     </div>
                   </li>
                 ))}
               </ul>
-            )
-          )}
+            ))}
 
-          {!loading && section === 'purchases' && (
-            purchases.length === 0 ? (
+          {!loading &&
+            section === 'purchases' &&
+            (purchases.length === 0 ? (
               <div className="cs-empty">
                 <p>No purchases recorded yet.</p>
                 <p className="cs-muted">Record a purchase from a product page to track future drops.</p>
@@ -225,11 +236,11 @@ export function SavedPage(): JSX.Element {
                   </li>
                 ))}
               </ul>
-            )
-          )}
+            ))}
 
-          {!loading && section === 'adjustments' && (
-            adjustmentOpportunities.length === 0 ? (
+          {!loading &&
+            section === 'adjustments' &&
+            (adjustmentOpportunities.length === 0 ? (
               <div className="cs-empty">
                 <p>No potential price-adjustment opportunities right now.</p>
               </div>
@@ -243,7 +254,8 @@ export function SavedPage(): JSX.Element {
                     </div>
                     <div className="cs-muted">
                       Paid {formatUSD(cents(adjustment.purchase_price_cents))} · now{' '}
-                      {formatUSD(cents(adjustment.new_price_cents))} · {adjustment.days_remaining} days remaining
+                      {formatUSD(cents(adjustment.new_price_cents))} · {adjustment.days_remaining} days
+                      remaining
                     </div>
                     <p className="cs-muted">
                       Verify eligibility with Costco. Final approval is determined by Costco.
@@ -268,11 +280,11 @@ export function SavedPage(): JSX.Element {
                   </li>
                 ))}
               </ul>
-            )
-          )}
+            ))}
 
-          {!loading && section === 'deals' && (
-            savedDeals.length === 0 ? (
+          {!loading &&
+            section === 'deals' &&
+            (savedDeals.length === 0 ? (
               <div className="cs-empty">
                 <p>No saved deals yet.</p>
                 <IonButton onClick={() => history.push('/deals')}>Browse deals</IonButton>
@@ -308,8 +320,7 @@ export function SavedPage(): JSX.Element {
                   </li>
                 ))}
               </ul>
-            )
-          )}
+            ))}
         </div>
       </IonContent>
     </IonPage>

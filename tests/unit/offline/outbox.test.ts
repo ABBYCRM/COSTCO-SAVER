@@ -15,9 +15,15 @@ describe('offline / outbox', () => {
       const store = new Map<string, string>();
       (globalThis as { localStorage?: Storage }).localStorage = {
         getItem: (k) => store.get(k) ?? null,
-        setItem: (k, v) => { store.set(k, v); },
-        removeItem: (k) => { store.delete(k); },
-        clear: () => { store.clear(); },
+        setItem: (k, v) => {
+          store.set(k, v);
+        },
+        removeItem: (k) => {
+          store.delete(k);
+        },
+        clear: () => {
+          store.clear();
+        },
         key: () => null,
         length: 0,
       };

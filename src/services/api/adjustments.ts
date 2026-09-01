@@ -23,10 +23,7 @@ export async function listAdjustments(): Promise<AdjustmentRow[]> {
   return result.adjustments;
 }
 
-export async function setAdjustmentStatus(
-  id: string,
-  status: AdjustmentRow['status'],
-): Promise<void> {
+export async function setAdjustmentStatus(id: string, status: AdjustmentRow['status']): Promise<void> {
   await apiFetch(`/api/v1/adjustments/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),

@@ -30,16 +30,30 @@ describe('integration / core flow', () => {
     // 3. Consensus from multiple observations
     const observations = [
       {
-        id: 'a', priceCents: 1997, observedAt: new Date(now.getTime() - 30 * 60_000),
-        submitterUserId: 'u1', source: 'shelf_scan' as const, hasAsterisk: false,
-        verificationStatus: 'verified' as const, evidencePresent: true,
-        hasReceipt: false, hasBarcodeSameSession: true, hasCostcoItemNumber: true,
+        id: 'a',
+        priceCents: 1997,
+        observedAt: new Date(now.getTime() - 30 * 60_000),
+        submitterUserId: 'u1',
+        source: 'shelf_scan' as const,
+        hasAsterisk: false,
+        verificationStatus: 'verified' as const,
+        evidencePresent: true,
+        hasReceipt: false,
+        hasBarcodeSameSession: true,
+        hasCostcoItemNumber: true,
       },
       {
-        id: 'b', priceCents: 1997, observedAt: new Date(now.getTime() - 60 * 60_000),
-        submitterUserId: 'u2', source: 'receipt' as const, hasAsterisk: false,
-        verificationStatus: 'verified' as const, evidencePresent: true,
-        hasReceipt: true, hasBarcodeSameSession: false, hasCostcoItemNumber: true,
+        id: 'b',
+        priceCents: 1997,
+        observedAt: new Date(now.getTime() - 60 * 60_000),
+        submitterUserId: 'u2',
+        source: 'receipt' as const,
+        hasAsterisk: false,
+        verificationStatus: 'verified' as const,
+        evidencePresent: true,
+        hasReceipt: true,
+        hasBarcodeSameSession: false,
+        hasCostcoItemNumber: true,
       },
     ];
     const consensus = computeConsensus(observations, now);
@@ -60,13 +74,19 @@ describe('integration / core flow', () => {
     // 5. Adjustment candidate from a recent purchase
     const adj = evaluateAdjustment(
       {
-        id: 'p1', productId: 'prod', warehouseId: 'wh',
-        unitPriceCents: cents(2999), quantity: 1,
+        id: 'p1',
+        productId: 'prod',
+        warehouseId: 'wh',
+        unitPriceCents: cents(2999),
+        quantity: 1,
         purchaseDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
       },
       {
-        productId: 'prod', warehouseId: 'wh',
-        priceCents: cents(1997), priceDropDate: now, confidence: 90,
+        productId: 'prod',
+        warehouseId: 'wh',
+        priceCents: cents(1997),
+        priceDropDate: now,
+        confidence: 90,
       },
       30,
       now,

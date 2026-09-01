@@ -83,7 +83,9 @@ export function BuyItPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start"><IonBackButton defaultHref="/home" /></IonButtons>
+          <IonButtons slot="start">
+            <IonBackButton defaultHref="/home" />
+          </IonButtons>
           <IonTitle>Record purchase</IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -109,13 +111,23 @@ export function BuyItPage(): JSX.Element {
               onIonChange={(e) => setQuantity(e.detail.value ?? '')}
             />
           </IonItem>
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-          {success && <p className="cs-strong" role="status">{success}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="cs-strong" role="status">
+              {success}
+            </p>
+          )}
           <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
             <IonButton onClick={submit} disabled={busy || !unitPrice || !selected}>
               {busy ? 'Saving…' : 'Save purchase'}
             </IonButton>
-            <IonButton fill="outline" onClick={() => history.goBack()}>Cancel</IonButton>
+            <IonButton fill="outline" onClick={() => history.goBack()}>
+              Cancel
+            </IonButton>
           </div>
           {existing?.consensus_price_cents != null && (
             <p className="cs-muted" style={{ marginTop: 'var(--cs-space-3)' }}>

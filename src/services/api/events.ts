@@ -16,14 +16,9 @@ export interface PriceEvent {
   warehouse_name: string;
 }
 
-export async function listPriceEvents(
-  warehouseId: string,
-  type?: string,
-): Promise<PriceEvent[]> {
+export async function listPriceEvents(warehouseId: string, type?: string): Promise<PriceEvent[]> {
   const params = new URLSearchParams({ warehouseId });
   if (type) params.set('type', type);
-  const result = await apiFetch<{ events: PriceEvent[] }>(
-    `/api/v1/price-events?${params.toString()}`,
-  );
+  const result = await apiFetch<{ events: PriceEvent[] }>(`/api/v1/price-events?${params.toString()}`);
   return result.events;
 }

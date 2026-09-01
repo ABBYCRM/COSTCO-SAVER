@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { estimateTrip, rankWarehousesByTrip, type TripListItem, type WarehousePricePoint } from '@domain/trip/tripCalculator';
+import {
+  estimateTrip,
+  rankWarehousesByTrip,
+  type TripListItem,
+  type WarehousePricePoint,
+} from '@domain/trip/tripCalculator';
 import { cents } from '@domain/money/cents';
 import { confidenceScore } from '@domain/confidence/confidenceEngine';
 import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
@@ -23,13 +28,13 @@ describe('integration / trip flow', () => {
 
     const yonkersPrices: WarehousePricePoint[] = [
       { productId: 'paper-towels', priceCents: cents(1997), freshness: 'LIVE', lastVerifiedAt: now },
-      { productId: 'eggs', priceCents: cents(499),   freshness: 'LIVE', lastVerifiedAt: now },
-      { productId: 'milk', priceCents: cents(349),   freshness: 'LIVE', lastVerifiedAt: now },
+      { productId: 'eggs', priceCents: cents(499), freshness: 'LIVE', lastVerifiedAt: now },
+      { productId: 'milk', priceCents: cents(349), freshness: 'LIVE', lastVerifiedAt: now },
     ];
     const newRochellePrices: WarehousePricePoint[] = [
       { productId: 'paper-towels', priceCents: cents(2097), freshness: 'LIVE', lastVerifiedAt: now },
-      { productId: 'eggs', priceCents: cents(449),   freshness: 'LIVE', lastVerifiedAt: now },
-      { productId: 'milk', priceCents: cents(349),   freshness: 'LIVE', lastVerifiedAt: now },
+      { productId: 'eggs', priceCents: cents(449), freshness: 'LIVE', lastVerifiedAt: now },
+      { productId: 'milk', priceCents: cents(349), freshness: 'LIVE', lastVerifiedAt: now },
       { productId: 'avocado-oil', priceCents: cents(1499), freshness: 'LIVE', lastVerifiedAt: now },
     ];
 
@@ -68,12 +73,18 @@ describe('integration / trip flow', () => {
     expect(conf).toBeGreaterThanOrEqual(70);
 
     const list: TripListItem[] = [{ productId: 'p1', quantity: 1 }];
-    const e = estimateTrip(list, [{
-      productId: 'p1',
-      priceCents: price,
-      freshness: 'LIVE',
-      lastVerifiedAt: now,
-    }], now);
+    const e = estimateTrip(
+      list,
+      [
+        {
+          productId: 'p1',
+          priceCents: price,
+          freshness: 'LIVE',
+          lastVerifiedAt: now,
+        },
+      ],
+      now,
+    );
     expect(e.estimatedBasketCents).toBe(1997);
     expect(e.itemsPriced).toBe(1);
   });

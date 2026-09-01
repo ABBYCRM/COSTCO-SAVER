@@ -16,19 +16,10 @@
 import type { Cents } from '@domain/money/cents';
 import { cents } from '@domain/money/cents';
 
-export type MarkdownClassification =
-  | 'clearance'
-  | 'manager_markdown'
-  | 'regular_signal'
-  | 'unclassified';
+export type MarkdownClassification = 'clearance' | 'manager_markdown' | 'regular_signal' | 'unclassified';
 
 export type MarkdownSignal =
-  | 'ending_97'
-  | 'ending_00'
-  | 'ending_88'
-  | 'ending_99'
-  | 'has_asterisk'
-  | 'unclassified_ending';
+  'ending_97' | 'ending_00' | 'ending_88' | 'ending_99' | 'has_asterisk' | 'unclassified_ending';
 
 export interface PriceCodeInput {
   readonly priceCents: number | Cents;
@@ -43,8 +34,7 @@ export interface PriceCodeResult {
 }
 
 export function classifyPriceCode(input: PriceCodeInput): PriceCodeResult {
-  const rawCents =
-    typeof input.priceCents === 'number' ? input.priceCents : (input.priceCents as number);
+  const rawCents = typeof input.priceCents === 'number' ? input.priceCents : (input.priceCents as number);
 
   if (!Number.isInteger(rawCents) || rawCents < 0) {
     throw new Error(`Price must be a non-negative integer (cents), got ${input.priceCents}`);

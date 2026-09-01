@@ -70,7 +70,9 @@ export function AccountPage(): JSX.Element {
       <IonContent fullscreen>
         <div className="cs-page">
           <section className="cs-card">
-            <p className="cs-muted" style={{ margin: 0 }}>Signed in as</p>
+            <p className="cs-muted" style={{ margin: 0 }}>
+              Signed in as
+            </p>
             <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-4)' }}>
               {user?.email ?? 'Loading…'}
             </div>
@@ -78,29 +80,45 @@ export function AccountPage(): JSX.Element {
           </section>
 
           <section className="cs-card">
-            <h3 className="cs-strong" style={{ marginTop: 0 }}>Shopping</h3>
-            <IonButton fill="outline" onClick={() => history.push('/trip')}>Open Trip Mode</IonButton>
-            <IonButton fill="outline" onClick={() => history.push('/notifications')}>Notifications</IonButton>
+            <h3 className="cs-strong" style={{ marginTop: 0 }}>
+              Shopping
+            </h3>
+            <IonButton fill="outline" onClick={() => history.push('/trip')}>
+              Open Trip Mode
+            </IonButton>
+            <IonButton fill="outline" onClick={() => history.push('/notifications')}>
+              Notifications
+            </IonButton>
             {user && ['moderator', 'admin'].includes(user.role) && (
-              <IonButton fill="outline" onClick={() => history.push('/admin')}>Moderator console</IonButton>
+              <IonButton fill="outline" onClick={() => history.push('/admin')}>
+                Moderator console
+              </IonButton>
             )}
           </section>
 
           <section className="cs-card">
-            <h3 className="cs-strong" style={{ marginTop: 0 }}>Privacy & data</h3>
+            <h3 className="cs-strong" style={{ marginTop: 0 }}>
+              Privacy & data
+            </h3>
             <p className="cs-muted">
-              Purchases, receipts, watches, notifications, and account data are isolated by authenticated
-              API ownership checks and PostgreSQL row policies.
+              Purchases, receipts, watches, notifications, and account data are isolated by authenticated API
+              ownership checks and PostgreSQL row policies.
             </p>
             <div className="cs-row" style={{ flexWrap: 'wrap' }}>
-              <IonButton fill="outline" onClick={handleExport} disabled={busy}>Export my data</IonButton>
+              <IonButton fill="outline" onClick={handleExport} disabled={busy}>
+                Export my data
+              </IonButton>
               <IonButton color="danger" fill="outline" onClick={handleDelete} disabled={busy}>
                 Delete account
               </IonButton>
             </div>
           </section>
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
 
           <IonButton expand="block" color="danger" onClick={handleSignOut} disabled={busy}>
             Sign out

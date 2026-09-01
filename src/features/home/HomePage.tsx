@@ -69,7 +69,9 @@ export function HomePage(): JSX.Element {
         </IonRefresher>
         <div className="cs-page">
           <section className="cs-card">
-            <p className="cs-muted" style={{ margin: 0 }}>Active warehouse</p>
+            <p className="cs-muted" style={{ margin: 0 }}>
+              Active warehouse
+            </p>
             <h2 className="cs-strong" style={{ margin: 'var(--cs-space-1) 0 0 0' }}>
               {selected?.name ?? 'Pick a warehouse'}
             </h2>
@@ -91,7 +93,11 @@ export function HomePage(): JSX.Element {
 
           <section style={{ marginTop: 'var(--cs-space-5)' }}>
             <h2 className="cs-section-title">Recent price drops</h2>
-            {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+            {error && (
+              <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+                {error}
+              </p>
+            )}
             {loadingDrops && (
               <div className="cs-card cs-stack" aria-busy="true">
                 <div className="cs-skeleton" style={{ width: '60%' }} />
@@ -102,7 +108,9 @@ export function HomePage(): JSX.Element {
               <div className="cs-empty">
                 <p>No verified price drops at this warehouse yet.</p>
                 <p className="cs-muted">Be the first to scan a shelf and submit a verified price.</p>
-                <button className="cs-button" onClick={() => location.assign('/scan')}>Scan a shelf</button>
+                <button className="cs-button" onClick={() => location.assign('/scan')}>
+                  Scan a shelf
+                </button>
               </div>
             )}
             <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -112,7 +120,9 @@ export function HomePage(): JSX.Element {
                     <div>
                       <div className="cs-strong">{drop.product_name}</div>
                       {drop.brand && <div className="cs-muted">{drop.brand}</div>}
-                      <div className="cs-muted">{drop.warehouse_name} · {new Date(drop.effective_at).toLocaleString()}</div>
+                      <div className="cs-muted">
+                        {drop.warehouse_name} · {new Date(drop.effective_at).toLocaleString()}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>

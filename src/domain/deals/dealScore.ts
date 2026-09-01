@@ -98,9 +98,10 @@ export function computeDealScore(input: DealScoreInput): DealScoreResult {
     }
   }
 
-  const score = Math.max(0, Math.min(100,
-    historicalDiscount + markdownSignal + confidence + freshness + warehouseAdvantage,
-  ));
+  const score = Math.max(
+    0,
+    Math.min(100, historicalDiscount + markdownSignal + confidence + freshness + warehouseAdvantage),
+  );
 
   let rating: DealScoreResult['rating'];
   if (score >= 85) rating = 'Excellent Deal';

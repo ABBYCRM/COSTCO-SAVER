@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useHistory } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSearchbar, IonBackButton, IonButtons } from '@ionic/react';
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonSearchbar,
+  IonBackButton,
+  IonButtons,
+} from '@ionic/react';
 import { searchProducts, type SearchHit } from '@services/api/search';
 
 export function SearchPage(): JSX.Element {
@@ -41,7 +50,9 @@ export function SearchPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start"><IonBackButton defaultHref="/home" /></IonButtons>
+          <IonButtons slot="start">
+            <IonBackButton defaultHref="/home" />
+          </IonButtons>
           <IonTitle>Search</IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -54,7 +65,11 @@ export function SearchPage(): JSX.Element {
             aria-label="Search products"
             debounce={0}
           />
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
           {loading && (
             <div className="cs-card cs-stack" aria-busy="true">
               <div className="cs-skeleton" style={{ width: '60%' }} />
@@ -79,7 +94,10 @@ export function SearchPage(): JSX.Element {
                   >
                     <div className="cs-strong">{h.canonicalName}</div>
                     {h.brand && <div className="cs-muted">{h.brand}</div>}
-                    <div className="cs-muted" style={{ display: 'flex', gap: 'var(--cs-space-2)', flexWrap: 'wrap' }}>
+                    <div
+                      className="cs-muted"
+                      style={{ display: 'flex', gap: 'var(--cs-space-2)', flexWrap: 'wrap' }}
+                    >
                       {h.size && <span>{h.size}</span>}
                       {h.category && <span className="cs-pill">{h.category}</span>}
                       {h.identifier && (

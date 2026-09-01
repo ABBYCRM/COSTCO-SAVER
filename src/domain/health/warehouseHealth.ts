@@ -17,16 +17,13 @@ export interface WarehouseHealthInput {
   readonly activeObservedProducts: number;
   readonly medianObservationAgeHours: number;
   readonly distinctContributorsLast30d: number;
-  readonly conflictRatio: number;             // 0..1
-  readonly evidenceRatio: number;             // 0..1
+  readonly conflictRatio: number; // 0..1
+  readonly evidenceRatio: number; // 0..1
   readonly dailyVerificationVolume7d: number; // count
 }
 
 export type WarehouseHealthLabel =
-  | 'Excellent coverage'
-  | 'Good coverage'
-  | 'Limited coverage'
-  | 'Building coverage';
+  'Excellent coverage' | 'Good coverage' | 'Limited coverage' | 'Building coverage';
 
 export interface WarehouseHealthResult {
   readonly score: number; // 0..100
@@ -67,9 +64,10 @@ export function computeWarehouseHealth(input: WarehouseHealthInput): WarehouseHe
   // A warehouse with no observations or no contributors is "Building" regardless
   // of how fresh nothing is, because freshness is meaningless when there is no
   // activity to be fresh about.
-  const hasActivity = input.activeObservedProducts > 0
-    || input.distinctContributorsLast30d > 0
-    || input.dailyVerificationVolume7d > 0;
+  const hasActivity =
+    input.activeObservedProducts > 0 ||
+    input.distinctContributorsLast30d > 0 ||
+    input.dailyVerificationVolume7d > 0;
 
   let label: WarehouseHealthLabel;
   if (!hasActivity) {

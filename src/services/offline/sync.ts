@@ -6,13 +6,7 @@
  * navigator.onLine on the web.
  */
 
-import {
-  enqueueOutbox,
-  listOutbox,
-  markOutboxStatus,
-  removeOutbox,
-  type OutboxItem,
-} from './outbox';
+import { enqueueOutbox, listOutbox, markOutboxStatus, removeOutbox, type OutboxItem } from './outbox';
 import { submitShelfObservation } from '@services/api/observations';
 import { confirmObservation } from '@services/api/confirmations';
 
@@ -58,7 +52,11 @@ async function dispatchOne(item: OutboxItem): Promise<void> {
     return;
   }
   if (item.kind === 'confirmation') {
-    const p = item.payload as unknown as { observationId: string; confirmedPriceCents: number; deviceSessionHash?: string | null };
+    const p = item.payload as unknown as {
+      observationId: string;
+      confirmedPriceCents: number;
+      deviceSessionHash?: string | null;
+    };
     await confirmObservation(p.observationId, p.confirmedPriceCents, p.deviceSessionHash ?? null);
     return;
   }

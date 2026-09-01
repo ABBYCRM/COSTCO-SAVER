@@ -243,20 +243,32 @@ export function ProductDetailPage(): JSX.Element {
   }, [state?.markdown_class]);
 
   if (!productId) {
-    return <IonPage><IonContent><div className="cs-empty">No product selected.</div></IonContent></IonPage>;
+    return (
+      <IonPage>
+        <IonContent>
+          <div className="cs-empty">No product selected.</div>
+        </IonContent>
+      </IonPage>
+    );
   }
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start"><IonBackButton defaultHref="/home" /></IonButtons>
+          <IonButtons slot="start">
+            <IonBackButton defaultHref="/home" />
+          </IonButtons>
           <IonTitle>{product?.canonical_name ?? 'Product'}</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
           {loading && (
             <div className="cs-card cs-stack" aria-busy="true">
               <div className="cs-skeleton" style={{ width: '70%' }} />
@@ -267,7 +279,9 @@ export function ProductDetailPage(): JSX.Element {
           {!loading && product && (
             <>
               <section className="cs-card">
-                <h2 className="cs-strong" style={{ margin: 0 }}>{product.canonical_name}</h2>
+                <h2 className="cs-strong" style={{ margin: 0 }}>
+                  {product.canonical_name}
+                </h2>
                 {product.brand && <div className="cs-muted">{product.brand}</div>}
                 {product.description && <p className="cs-muted">{product.description}</p>}
                 <div className="cs-row" style={{ flexWrap: 'wrap' }}>
@@ -283,7 +297,10 @@ export function ProductDetailPage(): JSX.Element {
                 <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
                   <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                     <div>
-                      <div className="cs-price" style={{ fontSize: 'var(--cs-font-size-7)', fontWeight: 700 }}>
+                      <div
+                        className="cs-price"
+                        style={{ fontSize: 'var(--cs-font-size-7)', fontWeight: 700 }}
+                      >
                         {formatUSD(cents(latestPrice))}
                       </div>
                       <div className="cs-muted">{selected.name}</div>
@@ -298,10 +315,15 @@ export function ProductDetailPage(): JSX.Element {
 
                   <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
                     {markdownLabel && <span className="cs-pill cs-pill--clearance">{markdownLabel}</span>}
-                    {state.has_asterisk && <span className="cs-pill cs-pill--aging">Asterisk / possible non-restock</span>}
+                    {state.has_asterisk && (
+                      <span className="cs-pill cs-pill--aging">Asterisk / possible non-restock</span>
+                    )}
                   </div>
 
-                  <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', gap: 'var(--cs-space-5)', flexWrap: 'wrap' }}>
+                  <div
+                    className="cs-row"
+                    style={{ marginTop: 'var(--cs-space-3)', gap: 'var(--cs-space-5)', flexWrap: 'wrap' }}
+                  >
                     <div>
                       <div className="cs-muted">Confidence</div>
                       <div className="cs-strong">
@@ -326,19 +348,35 @@ export function ProductDetailPage(): JSX.Element {
 
                   <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
                     <IonButton onClick={() => setShowWatchModal(true)}>Watch</IonButton>
-                    <IonButton fill="outline" onClick={handleSaveDeal} disabled={busy}>Save deal</IonButton>
-                    <IonButton fill="outline" onClick={handleAddToList} disabled={busy}>Add to list</IonButton>
-                    <IonButton fill="outline" onClick={() => setShowConfirmModal(true)}>Verify price</IonButton>
-                    <IonButton fill="outline" onClick={() => setShowChangeModal(true)}>Report change</IonButton>
-                    <IonButton fill="outline" onClick={() => history.push(`/product/${productId}/buy`)}>Bought it</IonButton>
-                    <IonButton fill="clear" onClick={handleShare}>Share</IonButton>
+                    <IonButton fill="outline" onClick={handleSaveDeal} disabled={busy}>
+                      Save deal
+                    </IonButton>
+                    <IonButton fill="outline" onClick={handleAddToList} disabled={busy}>
+                      Add to list
+                    </IonButton>
+                    <IonButton fill="outline" onClick={() => setShowConfirmModal(true)}>
+                      Verify price
+                    </IonButton>
+                    <IonButton fill="outline" onClick={() => setShowChangeModal(true)}>
+                      Report change
+                    </IonButton>
+                    <IonButton fill="outline" onClick={() => history.push(`/product/${productId}/buy`)}>
+                      Bought it
+                    </IonButton>
+                    <IonButton fill="clear" onClick={handleShare}>
+                      Share
+                    </IonButton>
                   </div>
                 </section>
               ) : (
                 <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-                  <h3 className="cs-strong" style={{ margin: 0 }}>No price at this warehouse yet</h3>
+                  <h3 className="cs-strong" style={{ margin: 0 }}>
+                    No price at this warehouse yet
+                  </h3>
                   <p className="cs-muted">Add the shelf price to start this warehouse's history.</p>
-                  <IonButton onClick={() => setShowChangeModal(true)} disabled={!selected}>Add price</IonButton>
+                  <IonButton onClick={() => setShowChangeModal(true)} disabled={!selected}>
+                    Add price
+                  </IonButton>
                 </section>
               )}
 
@@ -350,7 +388,9 @@ export function ProductDetailPage(): JSX.Element {
 
               {state && latestPrice != null && (
                 <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-                  <h3 className="cs-strong" style={{ margin: 0 }}>Deal analysis</h3>
+                  <h3 className="cs-strong" style={{ margin: 0 }}>
+                    Deal analysis
+                  </h3>
                   <DealBreakdown
                     priceCents={latestPrice}
                     markdown={state.markdown_class}
@@ -361,21 +401,31 @@ export function ProductDetailPage(): JSX.Element {
               )}
 
               <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-                <h3 className="cs-strong" style={{ marginTop: 0 }}>Price history</h3>
+                <h3 className="cs-strong" style={{ marginTop: 0 }}>
+                  Price history
+                </h3>
                 <PriceHistory observations={priceHistory} />
               </section>
 
               <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-                <h3 className="cs-strong" style={{ marginTop: 0 }}>Warehouse comparison</h3>
+                <h3 className="cs-strong" style={{ marginTop: 0 }}>
+                  Warehouse comparison
+                </h3>
                 {warehouseStates.length === 0 ? (
                   <p className="cs-muted">No other warehouse prices have been reported yet.</p>
                 ) : (
                   <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {warehouseStates.map((warehouse) => (
-                      <li key={warehouse.warehouse_id} className="cs-row" style={{ justifyContent: 'space-between' }}>
+                      <li
+                        key={warehouse.warehouse_id}
+                        className="cs-row"
+                        style={{ justifyContent: 'space-between' }}
+                      >
                         <div>
                           <div className="cs-strong">{warehouse.name}</div>
-                          <div className="cs-muted">{warehouse.city}, {warehouse.state} · {warehouse.freshness_class}</div>
+                          <div className="cs-muted">
+                            {warehouse.city}, {warehouse.state} · {warehouse.freshness_class}
+                          </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div className="cs-price cs-strong">
@@ -392,7 +442,8 @@ export function ProductDetailPage(): JSX.Element {
               </section>
 
               <p className="cs-muted" style={{ marginTop: 'var(--cs-space-4)' }}>
-                Prices and availability can vary by warehouse and change without notice. Verify in store before traveling specifically for an item.
+                Prices and availability can vary by warehouse and change without notice. Verify in store
+                before traveling specifically for an item.
               </p>
             </>
           )}
@@ -403,7 +454,8 @@ export function ProductDetailPage(): JSX.Element {
         <div className="cs-page">
           <h2 className="cs-section-title">Verify price</h2>
           <p className="cs-muted">
-            Enter the shelf price you see now. Matching prices refresh confidence; a different price is recorded as a conflict.
+            Enter the shelf price you see now. Matching prices refresh confidence; a different price is
+            recorded as a conflict.
           </p>
           <IonItem>
             <IonLabel position="stacked">Current price (USD)</IonLabel>
@@ -415,8 +467,12 @@ export function ProductDetailPage(): JSX.Element {
             />
           </IonItem>
           <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleConfirmPrice} disabled={busy || !confirmPrice}>Confirm</IonButton>
-            <IonButton fill="outline" onClick={() => setShowConfirmModal(false)}>Cancel</IonButton>
+            <IonButton onClick={handleConfirmPrice} disabled={busy || !confirmPrice}>
+              Confirm
+            </IonButton>
+            <IonButton fill="outline" onClick={() => setShowConfirmModal(false)}>
+              Cancel
+            </IonButton>
           </div>
         </div>
       </IonModal>
@@ -443,8 +499,12 @@ export function ProductDetailPage(): JSX.Element {
             />
           </IonItem>
           <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleReportChange} disabled={busy || !changePrice || !selected}>Submit</IonButton>
-            <IonButton fill="outline" onClick={() => setShowChangeModal(false)}>Cancel</IonButton>
+            <IonButton onClick={handleReportChange} disabled={busy || !changePrice || !selected}>
+              Submit
+            </IonButton>
+            <IonButton fill="outline" onClick={() => setShowChangeModal(false)}>
+              Cancel
+            </IonButton>
           </div>
         </div>
       </IonModal>
@@ -462,23 +522,43 @@ export function ProductDetailPage(): JSX.Element {
           </IonItem>
           <IonItem>
             <IonLabel>Notify on any verified drop</IonLabel>
-            <IonCheckbox checked={watchAnyDrop} onIonChange={(e) => setWatchAnyDrop(e.detail.checked)} slot="end" />
+            <IonCheckbox
+              checked={watchAnyDrop}
+              onIonChange={(e) => setWatchAnyDrop(e.detail.checked)}
+              slot="end"
+            />
           </IonItem>
           <IonItem>
             <IonLabel>Notify on .97 clearance</IonLabel>
-            <IonCheckbox checked={watchClearance} onIonChange={(e) => setWatchClearance(e.detail.checked)} slot="end" />
+            <IonCheckbox
+              checked={watchClearance}
+              onIonChange={(e) => setWatchClearance(e.detail.checked)}
+              slot="end"
+            />
           </IonItem>
           <IonItem>
             <IonLabel>Notify on .00 / .88 manager markdown</IonLabel>
-            <IonCheckbox checked={watchManager} onIonChange={(e) => setWatchManager(e.detail.checked)} slot="end" />
+            <IonCheckbox
+              checked={watchManager}
+              onIonChange={(e) => setWatchManager(e.detail.checked)}
+              slot="end"
+            />
           </IonItem>
           <IonItem>
             <IonLabel>Notify on asterisk</IonLabel>
-            <IonCheckbox checked={watchAsterisk} onIonChange={(e) => setWatchAsterisk(e.detail.checked)} slot="end" />
+            <IonCheckbox
+              checked={watchAsterisk}
+              onIonChange={(e) => setWatchAsterisk(e.detail.checked)}
+              slot="end"
+            />
           </IonItem>
           <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleCreateWatch} disabled={busy}>Save watch</IonButton>
-            <IonButton fill="outline" onClick={() => setShowWatchModal(false)}>Cancel</IonButton>
+            <IonButton onClick={handleCreateWatch} disabled={busy}>
+              Save watch
+            </IonButton>
+            <IonButton fill="outline" onClick={() => setShowWatchModal(false)}>
+              Cancel
+            </IonButton>
           </div>
         </div>
       </IonModal>
@@ -508,10 +588,13 @@ function DealBreakdown({
     <div className="cs-stack">
       <div className="cs-row" style={{ justifyContent: 'space-between' }}>
         <div className="cs-strong">{score.rating}</div>
-        <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>{score.score}/100</div>
+        <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
+          {score.score}/100
+        </div>
       </div>
       <div className="cs-muted">
-        Markdown {score.components.markdownSignal} · Confidence {score.components.confidence} · Freshness {score.components.freshness}
+        Markdown {score.components.markdownSignal} · Confidence {score.components.confidence} · Freshness{' '}
+        {score.components.freshness}
       </div>
     </div>
   );
@@ -555,13 +638,7 @@ function PriceHistory({ observations }: { observations: PriceObservation[] }): J
           vectorEffect="non-scaling-stroke"
         />
         {points.map((point) => (
-          <circle
-            key={point.row.id}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-            fill="currentColor"
-          >
+          <circle key={point.row.id} cx={point.x} cy={point.y} r="4" fill="currentColor">
             <title>
               {formatUSD(cents(point.row.price_cents))} · {new Date(point.row.observed_at).toLocaleString()}
             </title>

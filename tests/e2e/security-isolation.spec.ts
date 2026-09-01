@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test';
 async function createAccount(page: import('@playwright/test').Page, label: string) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Need an account? Create one' }).click();
-  await page.getByLabel('Email').fill(
-    `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`,
-  );
+  await page
+    .getByLabel('Email')
+    .fill(`e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`);
   await page.getByLabel('Password').fill('Costco-saver-test-123!');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByText('Active warehouse')).toBeVisible();

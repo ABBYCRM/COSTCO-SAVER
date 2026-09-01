@@ -1,10 +1,4 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  scrypt as scryptCallback,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const scrypt = promisify(scryptCallback);
@@ -53,18 +47,14 @@ export function signAccessToken(user) {
       iss: 'costco-saver',
     }),
   );
-  const signature = createHmac('sha256', jwtSecret())
-    .update(`${header}.${payload}`)
-    .digest('base64url');
+  const signature = createHmac('sha256', jwtSecret()).update(`${header}.${payload}`).digest('base64url');
   return `${header}.${payload}.${signature}`;
 }
 
 export function verifyAccessToken(token) {
   const [header, payload, signature] = String(token || '').split('.');
   if (!header || !payload || !signature) throw new Error('Invalid access token');
-  const expected = createHmac('sha256', jwtSecret())
-    .update(`${header}.${payload}`)
-    .digest();
+  const expected = createHmac('sha256', jwtSecret()).update(`${header}.${payload}`).digest();
   const actual = Buffer.from(signature, 'base64url');
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     throw new Error('Invalid access token');
@@ -95,13 +85,7 @@ export async function issueSession(client, user, metadata = {}) {
     `INSERT INTO refresh_tokens
       (user_id, token_hash, expires_at, user_agent, ip_address)
      VALUES ($1, $2, $3, $4, $5)`,
-    [
-      user.id,
-      refresh.hash,
-      expiresAt,
-      metadata.userAgent || null,
-      metadata.ipAddress || null,
-    ],
+    [user.id, refresh.hash, expiresAt, metadata.userAgent || null, metadata.ipAddress || null],
   );
 
   return {

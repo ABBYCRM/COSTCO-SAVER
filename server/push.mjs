@@ -128,27 +128,24 @@ async function sendFcm(token, notification) {
   try {
     const auth = await googleAccessToken();
     if (!auth) return { ok: false, error: 'FCM credentials not configured' };
-    const response = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`,
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${auth.token}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: {
-            token,
-            notification: { title: notification.title, body: notification.body },
-            data: {
-              deep_link: notification.deep_link || '',
-              notification_id: notification.id,
-            },
-            android: { priority: 'high' },
-          },
-        }),
+    const response = await fetch(`https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${auth.token}`,
+        'content-type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        message: {
+          token,
+          notification: { title: notification.title, body: notification.body },
+          data: {
+            deep_link: notification.deep_link || '',
+            notification_id: notification.id,
+          },
+          android: { priority: 'high' },
+        },
+      }),
+    });
     const body = await response.text();
     return {
       ok: response.ok,

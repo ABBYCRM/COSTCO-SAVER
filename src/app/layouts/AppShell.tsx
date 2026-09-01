@@ -1,17 +1,6 @@
 import { useEffect } from 'react';
-import {
-  IonIcon,
-  IonLabel,
-  IonTabBar,
-  IonTabButton,
-} from '@ionic/react';
-import {
-  bookmarkOutline,
-  homeOutline,
-  personOutline,
-  pricetagOutline,
-  scanOutline,
-} from 'ionicons/icons';
+import { IonIcon, IonLabel, IonTabBar, IonTabButton } from '@ionic/react';
+import { bookmarkOutline, homeOutline, personOutline, pricetagOutline, scanOutline } from 'ionicons/icons';
 import { registerNativePush } from '@services/push/registerNativePush';
 
 export function AppShell(): JSX.Element {

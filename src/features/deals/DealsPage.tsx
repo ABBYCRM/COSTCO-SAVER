@@ -1,13 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  IonChip,
-  IonContent,
-  IonHeader,
-  IonLabel,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/react';
+import { IonChip, IonContent, IonHeader, IonLabel, IonPage, IonTitle, IonToolbar } from '@ionic/react';
 import { useHistory } from 'react-router';
 import { useWarehouse } from '@stores/warehouse';
 import { listDeals, type DealRow } from '@services/api/deals';
@@ -53,7 +45,11 @@ export function DealsPage(): JSX.Element {
   if (!selected) {
     return (
       <IonPage>
-        <IonHeader><IonToolbar><IonTitle>Deals</IonTitle></IonToolbar></IonHeader>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Deals</IonTitle>
+          </IonToolbar>
+        </IonHeader>
         <IonContent>
           <div className="cs-empty">Pick a warehouse on the Home tab to see deals there.</div>
         </IonContent>
@@ -71,19 +67,29 @@ export function DealsPage(): JSX.Element {
       <IonContent fullscreen>
         <div className="cs-page">
           <div className="cs-row" style={{ flexWrap: 'wrap', gap: 'var(--cs-space-2)' }}>
-            {([
-              ['all', 'All'],
-              ['clearance', 'Clearance .97'],
-              ['manager_markdown', 'Manager markdown'],
-              ['asterisk', 'Asterisk'],
-            ] as Array<[Filter, string]>).map(([value, label]) => (
-              <IonChip key={value} onClick={() => setFilter(value)} color={filter === value ? 'primary' : undefined}>
+            {(
+              [
+                ['all', 'All'],
+                ['clearance', 'Clearance .97'],
+                ['manager_markdown', 'Manager markdown'],
+                ['asterisk', 'Asterisk'],
+              ] as Array<[Filter, string]>
+            ).map(([value, label]) => (
+              <IonChip
+                key={value}
+                onClick={() => setFilter(value)}
+                color={filter === value ? 'primary' : undefined}
+              >
                 <IonLabel>{label}</IonLabel>
               </IonChip>
             ))}
           </div>
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && (
+            <p role="alert" style={{ color: 'var(--cs-danger)' }}>
+              {error}
+            </p>
+          )}
           {loading && (
             <div className="cs-card cs-stack" aria-busy="true">
               <div className="cs-skeleton" style={{ width: '60%' }} />
@@ -93,7 +99,9 @@ export function DealsPage(): JSX.Element {
           {!loading && deals.length === 0 && (
             <div className="cs-empty">
               <p>No verified prices match this filter yet.</p>
-              <button className="cs-button" onClick={() => location.assign('/scan')}>Scan a shelf</button>
+              <button className="cs-button" onClick={() => location.assign('/scan')}>
+                Scan a shelf
+              </button>
             </div>
           )}
           <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -128,7 +136,9 @@ export function DealsPage(): JSX.Element {
                             ? formatUSD(cents(deal.consensus_price_cents))
                             : '—'}
                         </div>
-                        <div className="cs-muted">{score.rating} · {score.score}</div>
+                        <div className="cs-muted">
+                          {score.rating} · {score.score}
+                        </div>
                       </div>
                     </div>
                   </button>

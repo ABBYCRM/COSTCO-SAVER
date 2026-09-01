@@ -54,10 +54,8 @@
 
   /* Typography */
   --cs-font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    "Noto Sans", sans-serif;
-  --cs-font-mono:
-    "SF Mono", ui-monospace, "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --cs-font-mono: 'SF Mono', ui-monospace, 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
   --cs-font-size-1: 12px;
   --cs-font-size-2: 14px;
   --cs-font-size-3: 16px;

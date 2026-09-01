@@ -4,23 +4,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getObject, newStorageKey, putObject } from './storage.mjs';
 import { pool, query, userTransaction, internalTransaction } from './db.mjs';
-import {
-  hashPassword,
-  verifyPassword,
-  issueSession,
-  hashToken,
-  signAccessToken,
-} from './auth.mjs';
-import {
-  readJson,
-  sendJson,
-  sendError,
-  requireUser,
-  clientIp,
-  parseUrl,
-  uuid,
-  cents,
-} from './http.mjs';
+import { hashPassword, verifyPassword, issueSession, hashToken, signAccessToken } from './auth.mjs';
+import { readJson, sendJson, sendError, requireUser, clientIp, parseUrl, uuid, cents } from './http.mjs';
 import {
   classifyMarkdown,
   freshnessFor,
@@ -43,7 +28,9 @@ function safeLimit(value, fallback = 50, max = 100) {
 }
 
 function normalizeEmail(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 function validateEmail(value) {
@@ -151,10 +138,10 @@ async function authLogout(req, res) {
   if (body.refreshToken) {
     const tokenHash = hashToken(body.refreshToken);
     await userTransaction(user.sub, (client) =>
-      client.query(
-        'UPDATE refresh_tokens SET revoked_at=now() WHERE user_id=$1 AND token_hash=$2',
-        [user.sub, tokenHash],
-      ),
+      client.query('UPDATE refresh_tokens SET revoked_at=now() WHERE user_id=$1 AND token_hash=$2', [
+        user.sub,
+        tokenHash,
+      ]),
     );
   } else {
     await userTransaction(user.sub, (client) =>
@@ -293,7 +280,8 @@ async function productByBarcode(res, barcode) {
      LIMIT 1`,
     [value],
   );
-  if (!result.rows[0]) return sendJson(res, 404, { error: { code: 'PRODUCT_NOT_FOUND', message: 'Product not found' } });
+  if (!result.rows[0])
+    return sendJson(res, 404, { error: { code: 'PRODUCT_NOT_FOUND', message: 'Product not found' } });
   sendJson(res, 200, { product: result.rows[0] });
 }
 
@@ -330,7 +318,8 @@ async function productDetail(res, productId, url) {
 
 async function productHistory(res, productId, url) {
   const warehouseId = url.searchParams.get('warehouseId');
-  if (!uuid(productId) || !uuid(warehouseId)) throw Object.assign(new Error('Invalid product or warehouse'), { status: 400 });
+  if (!uuid(productId) || !uuid(warehouseId))
+    throw Object.assign(new Error('Invalid product or warehouse'), { status: 400 });
   const result = await query(
     `SELECT id,price_cents,currency,observed_at,source_type,markdown_class,has_asterisk,verification_status
      FROM price_observations
@@ -364,7 +353,9 @@ async function createProvisionalProduct(req, res) {
   const brand = body.brand ? requireString(body.brand, 'brand', 1, 120) : null;
   const barcode = body.barcode ? requireString(body.barcode, 'barcode', 4, 32) : null;
   const barcodeType = body.barcodeType ? requireString(body.barcodeType, 'barcodeType', 3, 24) : null;
-  const itemNumber = body.costcoItemNumber ? requireString(body.costcoItemNumber, 'costcoItemNumber', 3, 32) : null;
+  const itemNumber = body.costcoItemNumber
+    ? requireString(body.costcoItemNumber, 'costcoItemNumber', 3, 32)
+    : null;
 
   const created = await internalTransaction(async (client) => {
     if (barcode) {
@@ -403,7 +394,21 @@ async function createProvisionalProduct(req, res) {
   sendJson(res, 201, { product: created });
 }
 
-async function processPriceEvent(client, { userId, productId, warehouseId, observationId, oldPrice, newPrice, observedAt, markdownClass, hasAsterisk, confidence }) {
+async function processPriceEvent(
+  client,
+  {
+    userId,
+    productId,
+    warehouseId,
+    observationId,
+    oldPrice,
+    newPrice,
+    observedAt,
+    markdownClass,
+    hasAsterisk,
+    confidence,
+  },
+) {
   const eventType = eventTypeFor(oldPrice, newPrice);
   let event = null;
   if (eventType) {
@@ -487,7 +492,18 @@ async function processPriceEvent(client, { userId, productId, warehouseId, obser
            potential_savings_cents=EXCLUDED.potential_savings_cents,
            status=CASE WHEN adjustment_candidates.status IN ('claimed','denied','dismissed') THEN adjustment_candidates.status ELSE 'opportunity' END
          RETURNING id`,
-        [p.user_id,p.id,event.id,p.unit_price_cents,newPrice,p.quantity,savings,p.purchase_date,observedAt,windowEnd],
+        [
+          p.user_id,
+          p.id,
+          event.id,
+          p.unit_price_cents,
+          newPrice,
+          p.quantity,
+          savings,
+          p.purchase_date,
+          observedAt,
+          windowEnd,
+        ],
       );
       await client.query(
         `INSERT INTO notifications(user_id,product_id,warehouse_id,price_event_id,adjustment_id,notification_type,title,body,deep_link)
@@ -519,7 +535,8 @@ async function createObservation(req, res) {
   const body = await readJson(req);
   const productId = requireString(body.productId, 'productId', 36, 36);
   const warehouseId = requireString(body.warehouseId, 'warehouseId', 36, 36);
-  if (!uuid(productId) || !uuid(warehouseId)) throw Object.assign(new Error('Invalid product or warehouse id'), { status: 400 });
+  if (!uuid(productId) || !uuid(warehouseId))
+    throw Object.assign(new Error('Invalid product or warehouse id'), { status: 400 });
   const priceCents = cents(body.priceCents);
   const sourceType = body.sourceType || 'manual_shelf_entry';
   const observedAt = body.observedAt ? new Date(body.observedAt) : new Date();
@@ -703,7 +720,8 @@ async function createWatch(req, res) {
   const body = await readJson(req);
   const productId = requireString(body.productId, 'productId', 36, 36);
   const warehouseId = body.warehouseId || null;
-  if (!uuid(productId) || (warehouseId && !uuid(warehouseId))) throw Object.assign(new Error('Invalid watch target'), { status: 400 });
+  if (!uuid(productId) || (warehouseId && !uuid(warehouseId)))
+    throw Object.assign(new Error('Invalid watch target'), { status: 400 });
   const created = await userTransaction(user.sub, (client) =>
     client.query(
       `INSERT INTO watches(user_id,product_id,warehouse_id,target_price_cents,target_percent,notify_any_drop,
@@ -758,7 +776,8 @@ async function createPurchase(req, res) {
     throw Object.assign(new Error('Invalid purchase'), { status: 400 });
   }
   const purchaseDate = body.purchaseDate ? new Date(body.purchaseDate) : new Date();
-  if (Number.isNaN(purchaseDate.getTime())) throw Object.assign(new Error('Invalid purchase date'), { status: 400 });
+  if (Number.isNaN(purchaseDate.getTime()))
+    throw Object.assign(new Error('Invalid purchase date'), { status: 400 });
   const total = Math.round(unitPrice * quantity);
   const result = await userTransaction(user.sub, (client) =>
     client.query(
@@ -766,7 +785,17 @@ async function createPurchase(req, res) {
           discount_cents,total_cents,currency,source,receipt_id)
        VALUES($1,$2,$3,$4,$5,$6,0,$7,'USD',$8,$9)
        RETURNING *`,
-      [user.sub, productId, warehouseId, purchaseDate.toISOString(), unitPrice, quantity, total, body.source || 'manual', body.receiptId || null],
+      [
+        user.sub,
+        productId,
+        warehouseId,
+        purchaseDate.toISOString(),
+        unitPrice,
+        quantity,
+        total,
+        body.source || 'manual',
+        body.receiptId || null,
+      ],
     ),
   );
   sendJson(res, 201, { purchase: result.rows[0] });
@@ -851,13 +880,14 @@ async function listAdjustments(req, res) {
 async function patchAdjustment(req, res, id) {
   const user = requireUser(req);
   const body = await readJson(req);
-  const allowed = new Set(['tracking','opportunity','claimed','denied','expired','dismissed']);
+  const allowed = new Set(['tracking', 'opportunity', 'claimed', 'denied', 'expired', 'dismissed']);
   if (!allowed.has(body.status)) throw Object.assign(new Error('Invalid adjustment status'), { status: 400 });
   const result = await userTransaction(user.sub, (client) =>
-    client.query(
-      'UPDATE adjustment_candidates SET status=$1 WHERE id=$2 AND user_id=$3 RETURNING *',
-      [body.status, id, user.sub],
-    ),
+    client.query('UPDATE adjustment_candidates SET status=$1 WHERE id=$2 AND user_id=$3 RETURNING *', [
+      body.status,
+      id,
+      user.sub,
+    ]),
   );
   if (!result.rows[0]) throw Object.assign(new Error('Adjustment not found'), { status: 404 });
   sendJson(res, 200, { adjustment: result.rows[0] });
@@ -866,10 +896,9 @@ async function patchAdjustment(req, res, id) {
 async function listNotifications(req, res) {
   const user = requireUser(req);
   const result = await userTransaction(user.sub, (client) =>
-    client.query(
-      'SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',
-      [user.sub],
-    ),
+    client.query('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100', [
+      user.sub,
+    ]),
   );
   sendJson(res, 200, { notifications: result.rows });
 }
@@ -891,7 +920,8 @@ async function registerDevice(req, res) {
   const body = await readJson(req);
   const token = requireString(body.token, 'token', 8, 4096);
   const platform = requireString(body.platform, 'platform', 3, 16);
-  if (!['ios','android','web'].includes(platform)) throw Object.assign(new Error('Invalid platform'), { status: 400 });
+  if (!['ios', 'android', 'web'].includes(platform))
+    throw Object.assign(new Error('Invalid platform'), { status: 400 });
   const result = await userTransaction(user.sub, (client) =>
     client.query(
       `INSERT INTO device_tokens(user_id,platform,token,app_version,last_seen_at)
@@ -905,51 +935,59 @@ async function registerDevice(req, res) {
 }
 
 async function createMediaRecord(req, res) {
-  const user=requireUser(req);
-  const body=await readJson(req);
-  const kind=requireString(body.kind,'kind',2,40);
-  if(!['shelf_photo','receipt_image','receipt_pdf','product_photo','other'].includes(kind)){
-    throw Object.assign(new Error('Invalid media kind'),{status:400});
+  const user = requireUser(req);
+  const body = await readJson(req);
+  const kind = requireString(body.kind, 'kind', 2, 40);
+  if (!['shelf_photo', 'receipt_image', 'receipt_pdf', 'product_photo', 'other'].includes(kind)) {
+    throw Object.assign(new Error('Invalid media kind'), { status: 400 });
   }
-  const fileName=requireString(body.fileName||'upload.bin','fileName',1,160);
-  const contentType=requireString(body.contentType||'application/octet-stream','contentType',3,120);
-  const allowed=new Set(['image/jpeg','image/png','image/webp','application/pdf']);
-  if(!allowed.has(contentType)) throw Object.assign(new Error('Unsupported media type'),{status:415});
-  const storageKey=newStorageKey(user.sub,kind,fileName);
-  const result=await userTransaction(user.sub,(client)=>
+  const fileName = requireString(body.fileName || 'upload.bin', 'fileName', 1, 160);
+  const contentType = requireString(body.contentType || 'application/octet-stream', 'contentType', 3, 120);
+  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+  if (!allowed.has(contentType)) throw Object.assign(new Error('Unsupported media type'), { status: 415 });
+  const storageKey = newStorageKey(user.sub, kind, fileName);
+  const result = await userTransaction(user.sub, (client) =>
     client.query(
       `INSERT INTO evidence(owner_user_id,kind,storage_key,content_type,moderation_state)
        VALUES($1,$2,$3,$4,'pending')
        RETURNING id,kind,content_type,created_at`,
-      [user.sub,kind,storageKey,contentType]
-    )
+      [user.sub, kind, storageKey, contentType],
+    ),
   );
-  sendJson(res,201,{evidence:result.rows[0],uploadUrl:`/api/v1/media/${result.rows[0].id}/content`});
+  sendJson(res, 201, { evidence: result.rows[0], uploadUrl: `/api/v1/media/${result.rows[0].id}/content` });
 }
 
-async function uploadMedia(req,res,id){
-  const user=requireUser(req);
-  const length=Number(req.headers['content-length']||0);
-  if(!Number.isFinite(length)||length<=0||length>15*1024*1024){
-    throw Object.assign(new Error('Media must be between 1 byte and 15 MB'),{status:413});
+async function uploadMedia(req, res, id) {
+  const user = requireUser(req);
+  const length = Number(req.headers['content-length'] || 0);
+  if (!Number.isFinite(length) || length <= 0 || length > 15 * 1024 * 1024) {
+    throw Object.assign(new Error('Media must be between 1 byte and 15 MB'), { status: 413 });
   }
-  const row=await userTransaction(user.sub,(client)=>
-    client.query('SELECT id,storage_key,content_type FROM evidence WHERE id=$1 AND owner_user_id=$2',[id,user.sub])
+  const row = await userTransaction(user.sub, (client) =>
+    client.query('SELECT id,storage_key,content_type FROM evidence WHERE id=$1 AND owner_user_id=$2', [
+      id,
+      user.sub,
+    ]),
   );
-  if(!row.rows[0]) throw Object.assign(new Error('Media record not found'),{status:404});
-  const media=row.rows[0];
-  const contentType=String(req.headers['content-type']||media.content_type||'application/octet-stream');
-  if(contentType!==media.content_type) throw Object.assign(new Error('Content type does not match media record'),{status:400});
-  await putObject({key:media.storage_key,body:req,contentType,contentLength:length});
-  await userTransaction(user.sub,(client)=>
-    client.query('UPDATE evidence SET byte_size=$1,uploaded_at=now() WHERE id=$2 AND owner_user_id=$3',[length,id,user.sub])
+  if (!row.rows[0]) throw Object.assign(new Error('Media record not found'), { status: 404 });
+  const media = row.rows[0];
+  const contentType = String(req.headers['content-type'] || media.content_type || 'application/octet-stream');
+  if (contentType !== media.content_type)
+    throw Object.assign(new Error('Content type does not match media record'), { status: 400 });
+  await putObject({ key: media.storage_key, body: req, contentType, contentLength: length });
+  await userTransaction(user.sub, (client) =>
+    client.query('UPDATE evidence SET byte_size=$1,uploaded_at=now() WHERE id=$2 AND owner_user_id=$3', [
+      length,
+      id,
+      user.sub,
+    ]),
   );
-  sendJson(res,200,{uploaded:true,evidenceId:id});
+  sendJson(res, 200, { uploaded: true, evidenceId: id });
 }
 
-async function downloadMedia(req,res,id){
-  const user=requireUser(req);
-  const row=await userTransaction(user.sub,(client)=>
+async function downloadMedia(req, res, id) {
+  const user = requireUser(req);
+  const row = await userTransaction(user.sub, (client) =>
     client.query(
       `SELECT e.id,e.storage_key,e.content_type,e.byte_size
        FROM evidence e
@@ -960,20 +998,20 @@ async function downloadMedia(req,res,id){
            WHERE po.evidence_id=e.id AND po.verification_status='verified'
          )
        )`,
-      [id,user.sub]
-    )
+      [id, user.sub],
+    ),
   );
-  if(!row.rows[0]) throw Object.assign(new Error('Media not found'),{status:404});
-  const media=row.rows[0];
-  const object=await getObject(media.storage_key);
-  res.writeHead(200,{
-    'content-type':object.ContentType||media.content_type||'application/octet-stream',
-    'content-length':String(object.ContentLength||media.byte_size||0),
-    'cache-control':'private, max-age=60',
-    'x-content-type-options':'nosniff'
+  if (!row.rows[0]) throw Object.assign(new Error('Media not found'), { status: 404 });
+  const media = row.rows[0];
+  const object = await getObject(media.storage_key);
+  res.writeHead(200, {
+    'content-type': object.ContentType || media.content_type || 'application/octet-stream',
+    'content-length': String(object.ContentLength || media.byte_size || 0),
+    'cache-control': 'private, max-age=60',
+    'x-content-type-options': 'nosniff',
   });
-  if(object.Body&&typeof object.Body.pipe==='function') object.Body.pipe(res);
-  else if(object.Body) res.end(Buffer.from(await object.Body.transformToByteArray()));
+  if (object.Body && typeof object.Body.pipe === 'function') object.Body.pipe(res);
+  else if (object.Body) res.end(Buffer.from(await object.Body.transformToByteArray()));
   else res.end();
 }
 
@@ -1051,7 +1089,17 @@ async function createReceipt(req, res) {
             discount_cents,total_cents,currency,source,receipt_id)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'USD','receipt',$9)
          RETURNING id`,
-        [user.sub, productId, warehouseId, purchaseDate.toISOString(), unitPrice, quantity, discount, total, receipt.id],
+        [
+          user.sub,
+          productId,
+          warehouseId,
+          purchaseDate.toISOString(),
+          unitPrice,
+          quantity,
+          discount,
+          total,
+          receipt.id,
+        ],
       );
       purchaseIds.push(purchase.rows[0].id);
 
@@ -1132,10 +1180,7 @@ async function createReceipt(req, res) {
 async function listReceipts(req, res) {
   const user = requireUser(req);
   const result = await userTransaction(user.sub, (client) =>
-    client.query(
-      'SELECT * FROM receipts WHERE user_id=$1 ORDER BY purchase_date DESC LIMIT 100',
-      [user.sub],
-    ),
+    client.query('SELECT * FROM receipts WHERE user_id=$1 ORDER BY purchase_date DESC LIMIT 100', [user.sub]),
   );
   sendJson(res, 200, { receipts: result.rows });
 }
@@ -1166,10 +1211,12 @@ async function adminSummary(req, res) {
   const result = await internalTransaction(async (client) => {
     const [products, observations, users, reports, conflicts] = await Promise.all([
       client.query("SELECT count(*)::int AS count FROM products WHERE status IN ('active','provisional')"),
-      client.query("SELECT count(*)::int AS count FROM price_observations"),
-      client.query("SELECT count(*)::int AS count FROM users WHERE disabled_at IS NULL"),
+      client.query('SELECT count(*)::int AS count FROM price_observations'),
+      client.query('SELECT count(*)::int AS count FROM users WHERE disabled_at IS NULL'),
       client.query("SELECT count(*)::int AS count FROM reports WHERE status IN ('open','reviewing')"),
-      client.query("SELECT count(*)::int AS count FROM warehouse_product_state WHERE conflicting_report_count > 0"),
+      client.query(
+        'SELECT count(*)::int AS count FROM warehouse_product_state WHERE conflicting_report_count > 0',
+      ),
     ]);
     return {
       products: products.rows[0].count,
@@ -1199,14 +1246,11 @@ async function adminPatchReport(req, res, id) {
   const moderator = requireModerator(req);
   const body = await readJson(req);
   const status = String(body.status || '');
-  if (!['open','reviewing','resolved','dismissed'].includes(status)) {
+  if (!['open', 'reviewing', 'resolved', 'dismissed'].includes(status)) {
     throw Object.assign(new Error('Invalid report status'), { status: 400 });
   }
   const result = await internalTransaction(async (client) => {
-    const updated = await client.query(
-      'UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',
-      [status, id],
-    );
+    const updated = await client.query('UPDATE reports SET status=$1 WHERE id=$2 RETURNING *', [status, id]);
     if (!updated.rows[0]) throw Object.assign(new Error('Report not found'), { status: 404 });
     await client.query(
       `INSERT INTO moderation_actions(moderator_user_id,action,entity_type,entity_id,reason,metadata)
@@ -1222,7 +1266,7 @@ async function adminPatchObservation(req, res, id) {
   const moderator = requireModerator(req);
   const body = await readJson(req);
   const status = String(body.status || '');
-  if (!['pending','verified','rejected','flagged'].includes(status)) {
+  if (!['pending', 'verified', 'rejected', 'flagged'].includes(status)) {
     throw Object.assign(new Error('Invalid verification status'), { status: 400 });
   }
   const result = await internalTransaction(async (client) => {
@@ -1245,7 +1289,8 @@ async function adminSetUserState(req, res, id) {
   const moderator = requireModerator(req);
   const body = await readJson(req);
   if (!uuid(id)) throw Object.assign(new Error('Invalid user id'), { status: 400 });
-  if (id === moderator.sub) throw Object.assign(new Error('Cannot suspend your own account'), { status: 400 });
+  if (id === moderator.sub)
+    throw Object.assign(new Error('Cannot suspend your own account'), { status: 400 });
   const disabled = Boolean(body.disabled);
   const result = await internalTransaction(async (client) => {
     const updated = await client.query(
@@ -1282,7 +1327,7 @@ async function listShoppingList(req, res) {
 async function upsertShoppingItem(req, res) {
   const user = requireUser(req);
   const body = await readJson(req);
-  const productId = requireString(body.productId,'productId',36,36);
+  const productId = requireString(body.productId, 'productId', 36, 36);
   const quantity = Number(body.quantity ?? 1);
   if (!uuid(productId) || !Number.isFinite(quantity) || quantity <= 0) {
     throw Object.assign(new Error('Invalid shopping-list item'), { status: 400 });
@@ -1298,7 +1343,7 @@ async function upsertShoppingItem(req, res) {
        ON CONFLICT(user_id,product_id) DO UPDATE SET
          quantity=EXCLUDED.quantity,note=EXCLUDED.note,preferred_warehouse_id=EXCLUDED.preferred_warehouse_id,updated_at=now()
        RETURNING *`,
-      [user.sub,productId,quantity,body.note || null,preferredWarehouseId],
+      [user.sub, productId, quantity, body.note || null, preferredWarehouseId],
     ),
   );
   sendJson(res, 201, { item: result.rows[0] });
@@ -1309,19 +1354,27 @@ async function patchShoppingItem(req, res, id) {
   const body = await readJson(req);
   const fields = [];
   const values = [];
-  if ('checked' in body) { values.push(Boolean(body.checked)); fields.push(`checked=${values.length}`); }
+  if ('checked' in body) {
+    values.push(Boolean(body.checked));
+    fields.push(`checked=${values.length}`);
+  }
   if ('quantity' in body) {
     const quantity = Number(body.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('Invalid quantity'), { status: 400 });
-    values.push(quantity); fields.push(`quantity=${values.length}`);
+    if (!Number.isFinite(quantity) || quantity <= 0)
+      throw Object.assign(new Error('Invalid quantity'), { status: 400 });
+    values.push(quantity);
+    fields.push(`quantity=${values.length}`);
   }
-  if ('note' in body) { values.push(body.note || null); fields.push(`note=${values.length}`); }
+  if ('note' in body) {
+    values.push(body.note || null);
+    fields.push(`note=${values.length}`);
+  }
   if (!fields.length) throw Object.assign(new Error('No shopping-list changes supplied'), { status: 400 });
-  values.push(id,user.sub);
+  values.push(id, user.sub);
   const result = await userTransaction(user.sub, (client) =>
     client.query(
       `UPDATE shopping_list_items SET ${fields.join(',')},updated_at=now()
-       WHERE id=${values.length-1} AND user_id=${values.length} RETURNING *`,
+       WHERE id=${values.length - 1} AND user_id=${values.length} RETURNING *`,
       values,
     ),
   );
@@ -1331,18 +1384,18 @@ async function patchShoppingItem(req, res, id) {
 
 async function deleteShoppingItem(req, res, id) {
   const user = requireUser(req);
-  const result = await userTransaction(user.sub,(client)=>
-    client.query('DELETE FROM shopping_list_items WHERE id=$1 AND user_id=$2 RETURNING id',[id,user.sub])
+  const result = await userTransaction(user.sub, (client) =>
+    client.query('DELETE FROM shopping_list_items WHERE id=$1 AND user_id=$2 RETURNING id', [id, user.sub]),
   );
   if (!result.rows[0]) throw Object.assign(new Error('Shopping-list item not found'), { status: 404 });
-  sendJson(res,200,{ok:true});
+  sendJson(res, 200, { ok: true });
 }
 
 async function tripComparison(req, res, url) {
-  const user=requireUser(req);
-  const warehouseIds=url.searchParams.getAll('warehouseId').filter(uuid).slice(0,10);
-  if (!warehouseIds.length) throw Object.assign(new Error('Select at least one warehouse'),{status:400});
-  const result=await userTransaction(user.sub,(client)=>
+  const user = requireUser(req);
+  const warehouseIds = url.searchParams.getAll('warehouseId').filter(uuid).slice(0, 10);
+  if (!warehouseIds.length) throw Object.assign(new Error('Select at least one warehouse'), { status: 400 });
+  const result = await userTransaction(user.sub, (client) =>
     client.query(
       `SELECT w.id AS warehouse_id,w.name AS warehouse_name,
               count(li.id)::int AS list_items,
@@ -1356,20 +1409,34 @@ async function tripComparison(req, res, url) {
        WHERE li.user_id=$1 AND li.checked=false
        GROUP BY w.id,w.name
        ORDER BY known_basket_cents ASC,priced_items DESC`,
-      [user.sub,warehouseIds]
-    )
+      [user.sub, warehouseIds],
+    ),
   );
-  sendJson(res,200,{warehouses:result.rows});
+  sendJson(res, 200, { warehouses: result.rows });
 }
 
 async function exportMe(req, res) {
   const user = requireUser(req);
   const data = await internalTransaction(async (client) => {
-    const userRow = await client.query('SELECT id,email,display_name,role,created_at FROM users WHERE id=$1', [user.sub]);
-    const purchases = await client.query('SELECT * FROM purchases WHERE user_id=$1 ORDER BY purchase_date DESC', [user.sub]);
-    const watches = await client.query('SELECT * FROM watches WHERE user_id=$1 ORDER BY created_at DESC', [user.sub]);
-    const receipts = await client.query('SELECT * FROM receipts WHERE user_id=$1 ORDER BY purchase_date DESC', [user.sub]);
-    const notifications = await client.query('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC', [user.sub]);
+    const userRow = await client.query(
+      'SELECT id,email,display_name,role,created_at FROM users WHERE id=$1',
+      [user.sub],
+    );
+    const purchases = await client.query(
+      'SELECT * FROM purchases WHERE user_id=$1 ORDER BY purchase_date DESC',
+      [user.sub],
+    );
+    const watches = await client.query('SELECT * FROM watches WHERE user_id=$1 ORDER BY created_at DESC', [
+      user.sub,
+    ]);
+    const receipts = await client.query(
+      'SELECT * FROM receipts WHERE user_id=$1 ORDER BY purchase_date DESC',
+      [user.sub],
+    );
+    const notifications = await client.query(
+      'SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC',
+      [user.sub],
+    );
     return {
       exportedAt: new Date().toISOString(),
       user: userRow.rows[0] || null,
@@ -1416,7 +1483,8 @@ async function routeApi(req, res, url, rid) {
   if (method === 'GET' && pathname === '/api/v1/warehouses') return listWarehouses(res, url);
   if (method === 'GET' && pathname === '/api/v1/price-events') return listPriceEvents(res, url);
   if (method === 'GET' && pathname === '/api/v1/products/search') return searchProducts(res, url);
-  if (method === 'POST' && pathname === '/api/v1/products/provisional') return createProvisionalProduct(req, res);
+  if (method === 'POST' && pathname === '/api/v1/products/provisional')
+    return createProvisionalProduct(req, res);
   if (method === 'POST' && pathname === '/api/v1/observations') return createObservation(req, res);
   if (method === 'GET' && pathname === '/api/v1/deals') return listDeals(res, url);
   if (method === 'GET' && pathname === '/api/v1/watches') return listWatches(req, res);
@@ -1461,16 +1529,16 @@ async function routeApi(req, res, url, rid) {
 }
 
 const mime = new Map([
-  ['.html','text/html; charset=utf-8'],
-  ['.js','text/javascript; charset=utf-8'],
-  ['.css','text/css; charset=utf-8'],
-  ['.svg','image/svg+xml'],
-  ['.png','image/png'],
-  ['.jpg','image/jpeg'],
-  ['.jpeg','image/jpeg'],
-  ['.webp','image/webp'],
-  ['.json','application/json; charset=utf-8'],
-  ['.woff2','font/woff2'],
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.woff2', 'font/woff2'],
 ]);
 
 async function serveStatic(req, res, url) {
@@ -1522,7 +1590,15 @@ const server = http.createServer(async (req, res) => {
     sendError(
       res,
       status,
-      status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : status === 404 ? 'NOT_FOUND' : status >= 500 ? 'INTERNAL_ERROR' : 'INVALID_REQUEST',
+      status === 401
+        ? 'UNAUTHORIZED'
+        : status === 403
+          ? 'FORBIDDEN'
+          : status === 404
+            ? 'NOT_FOUND'
+            : status >= 500
+              ? 'INTERNAL_ERROR'
+              : 'INVALID_REQUEST',
       status >= 500 ? 'Unexpected server error' : String(error?.message || 'Request failed'),
       rid,
     );
