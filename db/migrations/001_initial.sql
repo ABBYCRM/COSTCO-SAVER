@@ -309,6 +309,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   deep_link text,
   read_at timestamptz,
   delivered_at timestamptz,
+  push_attempts integer NOT NULL DEFAULT 0,
+  last_push_error text,
+  next_push_attempt_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
