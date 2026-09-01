@@ -979,19 +979,154 @@ async function downloadMedia(req,res,id){
 
 async function createReceipt(req, res) {
   const user = requireUser(req);
-  const body = await readJson(req);
+  const body = await readJson(req, 2_000_000);
   const warehouseId = body.warehouseId || null;
-  if (warehouseId && !uuid(warehouseId)) throw Object.assign(new Error('Invalid warehouse'), { status: 400 });
+  if (warehouseId && !uuid(warehouseId)) {
+    throw Object.assign(new Error('Invalid warehouse'), { status: 400 });
+  }
   const purchaseDate = new Date(body.purchaseDate || Date.now());
-  if (Number.isNaN(purchaseDate.getTime())) throw Object.assign(new Error('Invalid purchase date'), { status: 400 });
-  const result = await userTransaction(user.sub, (client) =>
-    client.query(
-      `INSERT INTO receipts(user_id,warehouse_id,purchase_date,total_cents,currency,status)
-       VALUES($1,$2,$3,$4,'USD','pending') RETURNING *`,
-      [user.sub, warehouseId, purchaseDate.toISOString(), body.totalCents == null ? null : cents(body.totalCents)],
-    ),
-  );
-  sendJson(res, 201, { receipt: result.rows[0] });
+  if (Number.isNaN(purchaseDate.getTime())) {
+    throw Object.assign(new Error('Invalid purchase date'), { status: 400 });
+  }
+  const lines = Array.isArray(body.lines) ? body.lines.slice(0, 200) : [];
+  const evidenceId = body.evidenceId || null;
+
+  const result = await internalTransaction(async (client) => {
+    if (evidenceId) {
+      const evidence = await client.query(
+        'SELECT id FROM evidence WHERE id=$1 AND owner_user_id=$2 AND uploaded_at IS NOT NULL',
+        [evidenceId, user.sub],
+      );
+      if (!evidence.rows[0]) {
+        throw Object.assign(new Error('Receipt evidence is missing or not uploaded'), { status: 400 });
+      }
+    }
+
+    const receiptResult = await client.query(
+      `INSERT INTO receipts(user_id,warehouse_id,purchase_date,evidence_id,total_cents,currency,status)
+       VALUES($1,$2,$3,$4,$5,'USD','confirmed') RETURNING *`,
+      [
+        user.sub,
+        warehouseId,
+        purchaseDate.toISOString(),
+        evidenceId,
+        body.totalCents == null ? null : cents(body.totalCents),
+      ],
+    );
+    const receipt = receiptResult.rows[0];
+    const purchaseIds = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] || {};
+      const quantity = Number(line.quantity ?? 1);
+      const unitPrice = line.unitPriceCents == null ? null : cents(line.unitPriceCents);
+      const total = cents(line.totalCents);
+      const discount = line.discountCents == null ? 0 : cents(line.discountCents);
+      const productId = line.productId || null;
+      if (!Number.isFinite(quantity) || quantity <= 0 || (productId && !uuid(productId))) {
+        throw Object.assign(new Error(`Invalid receipt line ${index + 1}`), { status: 400 });
+      }
+
+      const lineResult = await client.query(
+        `INSERT INTO receipt_lines(receipt_id,product_id,raw_description,costco_item_number,quantity,
+            unit_price_cents,discount_cents,total_cents,currency,line_order)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,'USD',$9) RETURNING id`,
+        [
+          receipt.id,
+          productId,
+          line.rawDescription || null,
+          line.costcoItemNumber || null,
+          quantity,
+          unitPrice,
+          discount,
+          total,
+          Number(line.lineOrder ?? index),
+        ],
+      );
+
+      if (!productId || !warehouseId || unitPrice == null) continue;
+
+      const purchase = await client.query(
+        `INSERT INTO purchases(user_id,product_id,warehouse_id,purchase_date,unit_price_cents,quantity,
+            discount_cents,total_cents,currency,source,receipt_id)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,'USD','receipt',$9)
+         RETURNING id`,
+        [user.sub, productId, warehouseId, purchaseDate.toISOString(), unitPrice, quantity, discount, total, receipt.id],
+      );
+      purchaseIds.push(purchase.rows[0].id);
+
+      const classification = classifyMarkdown(unitPrice, false);
+      const previousState = await client.query(
+        `SELECT * FROM warehouse_product_state WHERE product_id=$1 AND warehouse_id=$2 FOR UPDATE`,
+        [productId, warehouseId],
+      );
+      const oldPrice =
+        previousState.rows[0]?.consensus_price_cents == null
+          ? null
+          : Number(previousState.rows[0].consensus_price_cents);
+      const observationIdempotency = `receipt:${receipt.id}:${lineResult.rows[0].id}`;
+      const observation = await client.query(
+        `INSERT INTO price_observations(product_id,warehouse_id,price_cents,currency,observed_at,source_type,
+            markdown_class,price_ending,has_asterisk,evidence_id,submitter_user_id,verification_status,idempotency_key)
+         VALUES($1,$2,$3,'USD',$4,'receipt',$5,$6,false,$7,$8,'verified',$9)
+         RETURNING *`,
+        [
+          productId,
+          warehouseId,
+          unitPrice,
+          purchaseDate.toISOString(),
+          classification.classification,
+          classification.ending,
+          evidenceId,
+          user.sub,
+          observationIdempotency,
+        ],
+      );
+      const confidence = initialConfidence({ hasEvidence: Boolean(evidenceId), sourceType: 'receipt' });
+      await client.query(
+        `INSERT INTO warehouse_product_state(product_id,warehouse_id,consensus_price_cents,currency,markdown_class,
+            has_asterisk,first_seen_at,last_verified_at,latest_observation_id,evidence_count,confidence_score,
+            freshness_class,updated_at)
+         VALUES($1,$2,$3,'USD',$4,false,$5,$5,$6,$7,$8,$9,now())
+         ON CONFLICT(product_id,warehouse_id) DO UPDATE SET
+           consensus_price_cents=EXCLUDED.consensus_price_cents,
+           markdown_class=EXCLUDED.markdown_class,
+           has_asterisk=false,
+           last_verified_at=EXCLUDED.last_verified_at,
+           latest_observation_id=EXCLUDED.latest_observation_id,
+           evidence_count=warehouse_product_state.evidence_count + EXCLUDED.evidence_count,
+           confidence_score=GREATEST(warehouse_product_state.confidence_score,EXCLUDED.confidence_score),
+           freshness_class=EXCLUDED.freshness_class,
+           updated_at=now()`,
+        [
+          productId,
+          warehouseId,
+          unitPrice,
+          classification.classification,
+          purchaseDate.toISOString(),
+          observation.rows[0].id,
+          evidenceId ? 1 : 0,
+          confidence,
+          freshnessFor(purchaseDate),
+        ],
+      );
+      await processPriceEvent(client, {
+        userId: user.sub,
+        productId,
+        warehouseId,
+        observationId: observation.rows[0].id,
+        oldPrice,
+        newPrice: unitPrice,
+        observedAt: purchaseDate.toISOString(),
+        markdownClass: classification.classification,
+        hasAsterisk: false,
+        confidence,
+      });
+    }
+
+    return { receipt, purchaseIds };
+  });
+  sendJson(res, 201, result);
 }
 
 async function listReceipts(req, res) {
