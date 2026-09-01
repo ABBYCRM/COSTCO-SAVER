@@ -1,4 +1,4 @@
-import { supabase } from '@services/supabase/client';
+import { apiFetch } from './client';
 
 export interface PurchaseRow {
   id: string;
@@ -12,6 +12,9 @@ export interface PurchaseRow {
   purchase_date: string;
   source: 'receipt' | 'manual' | 'imported';
   receipt_id: string | null;
+  canonical_name?: string;
+  brand?: string | null;
+  warehouse_name?: string;
 }
 
 export interface CreatePurchaseInput {
@@ -25,37 +28,18 @@ export interface CreatePurchaseInput {
 }
 
 export async function listPurchases(): Promise<PurchaseRow[]> {
-  const { data, error } = await supabase()
-    .from('purchases')
-    .select('id, product_id, warehouse_id, unit_price_cents, quantity, discount_cents, total_cents, currency, purchase_date, source, receipt_id')
-    .order('purchase_date', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as PurchaseRow[];
+  const result = await apiFetch<{ purchases: PurchaseRow[] }>('/api/v1/purchases');
+  return result.purchases;
 }
 
 export async function createPurchase(input: CreatePurchaseInput): Promise<PurchaseRow> {
-  const total = Math.max(0, Math.round(input.unitPriceCents * input.quantity));
-  const { data, error } = await supabase()
-    .from('purchases')
-    .insert({
-      product_id: input.productId,
-      warehouse_id: input.warehouseId,
-      unit_price_cents: input.unitPriceCents,
-      quantity: input.quantity,
-      discount_cents: 0,
-      total_cents: total,
-      currency: 'USD',
-      purchase_date: input.purchaseDate,
-      source: input.source ?? 'manual',
-      receipt_id: input.receiptId ?? null,
-    })
-    .select('id, product_id, warehouse_id, unit_price_cents, quantity, discount_cents, total_cents, currency, purchase_date, source, receipt_id')
-    .single();
-  if (error) throw error;
-  return data as PurchaseRow;
+  const result = await apiFetch<{ purchase: PurchaseRow }>('/api/v1/purchases', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return result.purchase;
 }
 
 export async function deletePurchase(id: string): Promise<void> {
-  const { error } = await supabase().from('purchases').delete().eq('id', id);
-  if (error) throw error;
+  await apiFetch<{ ok: boolean }>(`/api/v1/purchases/${id}`, { method: 'DELETE' });
 }
