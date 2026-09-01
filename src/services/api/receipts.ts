@@ -1,5 +1,4 @@
 import { apiFetch } from './client';
-import { createPurchase } from './purchases';
 
 export interface ReceiptRow {
   id: string;
@@ -16,6 +15,7 @@ export interface ReceiptLineInput {
   costcoItemNumber: string | null;
   quantity: number;
   unitPriceCents: number;
+  discountCents?: number;
   totalCents: number;
   lineOrder: number;
 }
@@ -24,40 +24,20 @@ export interface CreateReceiptInput {
   warehouseId: string | null;
   purchaseDate: string;
   totalCents: number | null;
+  evidenceId?: string | null;
   lines: ReceiptLineInput[];
 }
 
 export interface CreateReceiptResult {
-  receiptId: string;
+  receipt: ReceiptRow;
   purchaseIds: string[];
 }
 
 export async function createReceipt(input: CreateReceiptInput): Promise<CreateReceiptResult> {
-  const result = await apiFetch<{ receipt: ReceiptRow }>('/api/v1/receipts', {
+  return apiFetch<CreateReceiptResult>('/api/v1/receipts', {
     method: 'POST',
-    body: JSON.stringify({
-      warehouseId: input.warehouseId,
-      purchaseDate: input.purchaseDate,
-      totalCents: input.totalCents,
-    }),
+    body: JSON.stringify(input),
   });
-  const purchaseIds: string[] = [];
-  if (input.warehouseId) {
-    for (const line of input.lines) {
-      if (!line.productId) continue;
-      const purchase = await createPurchase({
-        productId: line.productId,
-        warehouseId: input.warehouseId,
-        unitPriceCents: line.unitPriceCents,
-        quantity: line.quantity,
-        purchaseDate: input.purchaseDate,
-        source: 'receipt',
-        receiptId: result.receipt.id,
-      });
-      purchaseIds.push(purchase.id);
-    }
-  }
-  return { receiptId: result.receipt.id, purchaseIds };
 }
 
 export async function listReceipts(): Promise<ReceiptRow[]> {
