@@ -1,38 +1,36 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { IonLoading } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
+import { currentUser } from '@services/api/auth';
 import { AuthScreen } from './AuthScreen';
 
 interface AuthGateProps {
   children: ReactNode;
 }
 
-/**
- * Auth gate. Renders a real Supabase auth screen when the user is signed out,
- * and the app shell when signed in. Never fakes a logged-in state.
- */
 export function AuthGate({ children }: AuthGateProps): JSX.Element {
   const [state, setState] = useState<'loading' | 'in' | 'out'>('loading');
 
   useEffect(() => {
     let active = true;
-    supabase()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        setState(data.session ? 'in' : 'out');
-      })
-      .catch((err) => {
-        console.error('auth.getSession failed', err);
+
+    const check = async () => {
+      try {
+        const user = await currentUser();
+        if (active) setState(user ? 'in' : 'out');
+      } catch {
         if (active) setState('out');
-      });
-    const { data: sub } = supabase().auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      setState(session ? 'in' : 'out');
-    });
+      }
+    };
+
+    void check();
+    const onSessionChanged = () => {
+      setState('loading');
+      void check();
+    };
+    window.addEventListener('costco-saver:session-changed', onSessionChanged);
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
+      window.removeEventListener('costco-saver:session-changed', onSessionChanged);
     };
   }, []);
 
