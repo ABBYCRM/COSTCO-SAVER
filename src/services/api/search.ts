@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, apiUrl } from './client';
 
 export interface SearchHit {
   productId: string;
@@ -44,7 +44,7 @@ export async function searchProducts(query: string, limit = 20): Promise<SearchH
 }
 
 export async function findProductByBarcode(barcode: string): Promise<{ id: string } | null> {
-  const response = await fetch(`/api/v1/products/barcode/${encodeURIComponent(barcode)}`, {
+  const response = await fetch(apiUrl(`/api/v1/products/barcode/${encodeURIComponent(barcode)}`), {
     headers: { accept: 'application/json' },
   });
   if (response.status === 404) return null;
