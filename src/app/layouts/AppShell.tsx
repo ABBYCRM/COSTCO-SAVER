@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   IonIcon,
   IonLabel,
@@ -11,8 +12,12 @@ import {
   pricetagOutline,
   scanOutline,
 } from 'ionicons/icons';
+import { registerNativePush } from '@services/push/registerNativePush';
 
 export function AppShell(): JSX.Element {
+  useEffect(() => {
+    void registerNativePush();
+  }, []);
   return (
     <IonTabBar slot="bottom">
       <IonTabButton tab="home" href="/home">
