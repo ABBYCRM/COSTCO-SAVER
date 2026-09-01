@@ -780,6 +780,55 @@ async function deletePurchase(req, res, id) {
   sendJson(res, 200, { ok: true });
 }
 
+async function listSavedDeals(req, res) {
+  const user = requireUser(req);
+  const result = await userTransaction(user.sub, (client) =>
+    client.query(
+      `SELECT s.*,p.canonical_name,p.brand,w.name AS warehouse_name,
+              st.consensus_price_cents,st.markdown_class,st.freshness_class,st.confidence_score,st.last_verified_at
+       FROM saved_deals s
+       JOIN products p ON p.id=s.product_id
+       JOIN warehouses w ON w.id=s.warehouse_id
+       LEFT JOIN warehouse_product_state st
+         ON st.product_id=s.product_id AND st.warehouse_id=s.warehouse_id
+       WHERE s.user_id=$1
+       ORDER BY s.saved_at DESC`,
+      [user.sub],
+    ),
+  );
+  sendJson(res, 200, { savedDeals: result.rows });
+}
+
+async function saveDeal(req, res) {
+  const user = requireUser(req);
+  const body = await readJson(req);
+  const productId = requireString(body.productId, 'productId', 36, 36);
+  const warehouseId = requireString(body.warehouseId, 'warehouseId', 36, 36);
+  if (!uuid(productId) || !uuid(warehouseId)) {
+    throw Object.assign(new Error('Invalid saved deal target'), { status: 400 });
+  }
+  const result = await userTransaction(user.sub, (client) =>
+    client.query(
+      `INSERT INTO saved_deals(user_id,product_id,warehouse_id,saved_price_cents)
+       VALUES($1,$2,$3,$4)
+       ON CONFLICT(user_id,product_id,warehouse_id) DO UPDATE
+         SET saved_price_cents=EXCLUDED.saved_price_cents,saved_at=now()
+       RETURNING *`,
+      [user.sub, productId, warehouseId, body.savedPriceCents == null ? null : cents(body.savedPriceCents)],
+    ),
+  );
+  sendJson(res, 201, { savedDeal: result.rows[0] });
+}
+
+async function deleteSavedDeal(req, res, id) {
+  const user = requireUser(req);
+  const result = await userTransaction(user.sub, (client) =>
+    client.query('DELETE FROM saved_deals WHERE id=$1 AND user_id=$2 RETURNING id', [id, user.sub]),
+  );
+  if (!result.rows[0]) throw Object.assign(new Error('Saved deal not found'), { status: 404 });
+  sendJson(res, 200, { ok: true });
+}
+
 async function listAdjustments(req, res) {
   const user = requireUser(req);
   const result = await userTransaction(user.sub, (client) =>
@@ -957,6 +1006,8 @@ async function routeApi(req, res, url, rid) {
   if (method === 'GET' && pathname === '/api/v1/purchases') return listPurchases(req, res);
   if (method === 'POST' && pathname === '/api/v1/purchases') return createPurchase(req, res);
   if (method === 'GET' && pathname === '/api/v1/adjustments') return listAdjustments(req, res);
+  if (method === 'GET' && pathname === '/api/v1/saved-deals') return listSavedDeals(req, res);
+  if (method === 'POST' && pathname === '/api/v1/saved-deals') return saveDeal(req, res);
   if (method === 'GET' && pathname === '/api/v1/notifications') return listNotifications(req, res);
   if (method === 'POST' && pathname === '/api/v1/device-tokens') return registerDevice(req, res);
   if (method === 'GET' && pathname === '/api/v1/receipts') return listReceipts(req, res);
