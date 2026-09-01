@@ -944,6 +944,215 @@ async function createReport(req, res) {
   sendJson(res, 201, { report: result.rows[0] });
 }
 
+function requireModerator(req) {
+  const user = requireUser(req);
+  if (!['moderator', 'admin'].includes(user.role)) {
+    throw Object.assign(new Error('Moderator access required'), { status: 403 });
+  }
+  return user;
+}
+
+async function adminSummary(req, res) {
+  requireModerator(req);
+  const result = await internalTransaction(async (client) => {
+    const [products, observations, users, reports, conflicts] = await Promise.all([
+      client.query("SELECT count(*)::int AS count FROM products WHERE status IN ('active','provisional')"),
+      client.query("SELECT count(*)::int AS count FROM price_observations"),
+      client.query("SELECT count(*)::int AS count FROM users WHERE disabled_at IS NULL"),
+      client.query("SELECT count(*)::int AS count FROM reports WHERE status IN ('open','reviewing')"),
+      client.query("SELECT count(*)::int AS count FROM warehouse_product_state WHERE conflicting_report_count > 0"),
+    ]);
+    return {
+      products: products.rows[0].count,
+      observations: observations.rows[0].count,
+      users: users.rows[0].count,
+      openReports: reports.rows[0].count,
+      priceConflicts: conflicts.rows[0].count,
+    };
+  });
+  sendJson(res, 200, { stats: result });
+}
+
+async function adminReports(req, res) {
+  requireModerator(req);
+  const result = await internalTransaction((client) =>
+    client.query(
+      `SELECT r.*,u.email AS reporter_email
+       FROM reports r LEFT JOIN users u ON u.id=r.user_id
+       ORDER BY CASE r.status WHEN 'open' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END,r.created_at DESC
+       LIMIT 200`,
+    ),
+  );
+  sendJson(res, 200, { reports: result.rows });
+}
+
+async function adminPatchReport(req, res, id) {
+  const moderator = requireModerator(req);
+  const body = await readJson(req);
+  const status = String(body.status || '');
+  if (!['open','reviewing','resolved','dismissed'].includes(status)) {
+    throw Object.assign(new Error('Invalid report status'), { status: 400 });
+  }
+  const result = await internalTransaction(async (client) => {
+    const updated = await client.query(
+      'UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',
+      [status, id],
+    );
+    if (!updated.rows[0]) throw Object.assign(new Error('Report not found'), { status: 404 });
+    await client.query(
+      `INSERT INTO moderation_actions(moderator_user_id,action,entity_type,entity_id,reason,metadata)
+       VALUES($1,'report_status_changed','report',$2,$3,$4::jsonb)`,
+      [moderator.sub, id, body.reason || null, JSON.stringify({ status })],
+    );
+    return updated.rows[0];
+  });
+  sendJson(res, 200, { report: result });
+}
+
+async function adminPatchObservation(req, res, id) {
+  const moderator = requireModerator(req);
+  const body = await readJson(req);
+  const status = String(body.status || '');
+  if (!['pending','verified','rejected','flagged'].includes(status)) {
+    throw Object.assign(new Error('Invalid verification status'), { status: 400 });
+  }
+  const result = await internalTransaction(async (client) => {
+    const updated = await client.query(
+      'UPDATE price_observations SET verification_status=$1 WHERE id=$2 RETURNING *',
+      [status, id],
+    );
+    if (!updated.rows[0]) throw Object.assign(new Error('Observation not found'), { status: 404 });
+    await client.query(
+      `INSERT INTO moderation_actions(moderator_user_id,action,entity_type,entity_id,reason,metadata)
+       VALUES($1,'observation_moderated','price_observation',$2,$3,$4::jsonb)`,
+      [moderator.sub, id, body.reason || null, JSON.stringify({ status })],
+    );
+    return updated.rows[0];
+  });
+  sendJson(res, 200, { observation: result });
+}
+
+async function adminSetUserState(req, res, id) {
+  const moderator = requireModerator(req);
+  const body = await readJson(req);
+  if (!uuid(id)) throw Object.assign(new Error('Invalid user id'), { status: 400 });
+  if (id === moderator.sub) throw Object.assign(new Error('Cannot suspend your own account'), { status: 400 });
+  const disabled = Boolean(body.disabled);
+  const result = await internalTransaction(async (client) => {
+    const updated = await client.query(
+      `UPDATE users SET disabled_at=CASE WHEN $1 THEN now() ELSE NULL END WHERE id=$2 RETURNING id,email,disabled_at`,
+      [disabled, id],
+    );
+    if (!updated.rows[0]) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (disabled) await client.query('UPDATE refresh_tokens SET revoked_at=now() WHERE user_id=$1', [id]);
+    await client.query(
+      `INSERT INTO moderation_actions(moderator_user_id,action,entity_type,entity_id,reason,metadata)
+       VALUES($1,$2,'user',$3,$4,'{}'::jsonb)`,
+      [moderator.sub, disabled ? 'user_suspended' : 'user_restored', id, body.reason || null],
+    );
+    return updated.rows[0];
+  });
+  sendJson(res, 200, { user: result });
+}
+
+async function listShoppingList(req, res) {
+  const user = requireUser(req);
+  const result = await userTransaction(user.sub, (client) =>
+    client.query(
+      `SELECT li.*,p.canonical_name,p.brand,w.name AS preferred_warehouse_name
+       FROM shopping_list_items li
+       JOIN products p ON p.id=li.product_id
+       LEFT JOIN warehouses w ON w.id=li.preferred_warehouse_id
+       WHERE li.user_id=$1 ORDER BY li.checked,li.created_at DESC`,
+      [user.sub],
+    ),
+  );
+  sendJson(res, 200, { items: result.rows });
+}
+
+async function upsertShoppingItem(req, res) {
+  const user = requireUser(req);
+  const body = await readJson(req);
+  const productId = requireString(body.productId,'productId',36,36);
+  const quantity = Number(body.quantity ?? 1);
+  if (!uuid(productId) || !Number.isFinite(quantity) || quantity <= 0) {
+    throw Object.assign(new Error('Invalid shopping-list item'), { status: 400 });
+  }
+  const preferredWarehouseId = body.preferredWarehouseId || null;
+  if (preferredWarehouseId && !uuid(preferredWarehouseId)) {
+    throw Object.assign(new Error('Invalid preferred warehouse'), { status: 400 });
+  }
+  const result = await userTransaction(user.sub, (client) =>
+    client.query(
+      `INSERT INTO shopping_list_items(user_id,product_id,quantity,note,preferred_warehouse_id,checked)
+       VALUES($1,$2,$3,$4,$5,false)
+       ON CONFLICT(user_id,product_id) DO UPDATE SET
+         quantity=EXCLUDED.quantity,note=EXCLUDED.note,preferred_warehouse_id=EXCLUDED.preferred_warehouse_id,updated_at=now()
+       RETURNING *`,
+      [user.sub,productId,quantity,body.note || null,preferredWarehouseId],
+    ),
+  );
+  sendJson(res, 201, { item: result.rows[0] });
+}
+
+async function patchShoppingItem(req, res, id) {
+  const user = requireUser(req);
+  const body = await readJson(req);
+  const fields = [];
+  const values = [];
+  if ('checked' in body) { values.push(Boolean(body.checked)); fields.push(`checked=${values.length}`); }
+  if ('quantity' in body) {
+    const quantity = Number(body.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('Invalid quantity'), { status: 400 });
+    values.push(quantity); fields.push(`quantity=${values.length}`);
+  }
+  if ('note' in body) { values.push(body.note || null); fields.push(`note=${values.length}`); }
+  if (!fields.length) throw Object.assign(new Error('No shopping-list changes supplied'), { status: 400 });
+  values.push(id,user.sub);
+  const result = await userTransaction(user.sub, (client) =>
+    client.query(
+      `UPDATE shopping_list_items SET ${fields.join(',')},updated_at=now()
+       WHERE id=${values.length-1} AND user_id=${values.length} RETURNING *`,
+      values,
+    ),
+  );
+  if (!result.rows[0]) throw Object.assign(new Error('Shopping-list item not found'), { status: 404 });
+  sendJson(res, 200, { item: result.rows[0] });
+}
+
+async function deleteShoppingItem(req, res, id) {
+  const user = requireUser(req);
+  const result = await userTransaction(user.sub,(client)=>
+    client.query('DELETE FROM shopping_list_items WHERE id=$1 AND user_id=$2 RETURNING id',[id,user.sub])
+  );
+  if (!result.rows[0]) throw Object.assign(new Error('Shopping-list item not found'), { status: 404 });
+  sendJson(res,200,{ok:true});
+}
+
+async function tripComparison(req, res, url) {
+  const user=requireUser(req);
+  const warehouseIds=url.searchParams.getAll('warehouseId').filter(uuid).slice(0,10);
+  if (!warehouseIds.length) throw Object.assign(new Error('Select at least one warehouse'),{status:400});
+  const result=await userTransaction(user.sub,(client)=>
+    client.query(
+      `SELECT w.id AS warehouse_id,w.name AS warehouse_name,
+              count(li.id)::int AS list_items,
+              count(s.consensus_price_cents)::int AS priced_items,
+              COALESCE(sum(s.consensus_price_cents * li.quantity) FILTER (WHERE s.consensus_price_cents IS NOT NULL),0)::bigint AS known_basket_cents,
+              max(s.last_verified_at) AS newest_price_at
+       FROM unnest($2::uuid[]) target(warehouse_id)
+       JOIN warehouses w ON w.id=target.warehouse_id
+       CROSS JOIN shopping_list_items li
+       LEFT JOIN warehouse_product_state s ON s.product_id=li.product_id AND s.warehouse_id=w.id
+       WHERE li.user_id=$1 AND li.checked=false
+       GROUP BY w.id,w.name
+       ORDER BY known_basket_cents ASC,priced_items DESC`,
+      [user.sub,warehouseIds]
+    )
+  );
+  sendJson(res,200,{warehouses:result.rows});
+}
+
 async function exportMe(req, res) {
   const user = requireUser(req);
   const data = await internalTransaction(async (client) => {
@@ -1013,6 +1222,11 @@ async function routeApi(req, res, url, rid) {
   if (method === 'GET' && pathname === '/api/v1/receipts') return listReceipts(req, res);
   if (method === 'POST' && pathname === '/api/v1/receipts') return createReceipt(req, res);
   if (method === 'POST' && pathname === '/api/v1/reports') return createReport(req, res);
+  if (method === 'GET' && pathname === '/api/v1/shopping-list') return listShoppingList(req, res);
+  if (method === 'POST' && pathname === '/api/v1/shopping-list') return upsertShoppingItem(req, res);
+  if (method === 'GET' && pathname === '/api/v1/trip-comparison') return tripComparison(req, res, url);
+  if (method === 'GET' && pathname === '/api/v1/admin/summary') return adminSummary(req, res);
+  if (method === 'GET' && pathname === '/api/v1/admin/reports') return adminReports(req, res);
 
   let match = pathname.match(/^\/api\/v1\/products\/barcode\/(.+)$/);
   if (method === 'GET' && match) return productByBarcode(res, match[1]);
