@@ -30,14 +30,20 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY);
 }
 
+function emitSessionChanged(): void {
+  window.dispatchEvent(new CustomEvent('costco-saver:session-changed'));
+}
+
 export function setSession(accessToken: string, refreshToken: string): void {
   localStorage.setItem(ACCESS_KEY, accessToken);
   localStorage.setItem(REFRESH_KEY, refreshToken);
+  emitSessionChanged();
 }
 
 export function clearSession(): void {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  emitSessionChanged();
 }
 
 async function refreshSession(): Promise<boolean> {
