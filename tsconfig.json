@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -29,25 +33,53 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@app/*": ["src/app/*"],
-      "@components/*": ["src/components/*"],
-      "@domain/*": ["src/domain/*"],
-      "@features/*": ["src/features/*"],
-      "@lib/*": ["src/lib/*"],
-      "@services/*": ["src/services/*"],
-      "@stores/*": ["src/stores/*"],
-      "@types/*": ["src/types/*"],
-      "@utils/*": ["src/utils/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@app/*": [
+        "src/app/*"
+      ],
+      "@components/*": [
+        "src/components/*"
+      ],
+      "@domain/*": [
+        "src/domain/*"
+      ],
+      "@features/*": [
+        "src/features/*"
+      ],
+      "@lib/*": [
+        "src/lib/*"
+      ],
+      "@services/*": [
+        "src/services/*"
+      ],
+      "@stores/*": [
+        "src/stores/*"
+      ],
+      "@types/*": [
+        "src/types/*"
+      ],
+      "@utils/*": [
+        "src/utils/*"
+      ]
     },
-    "types": ["vite/client", "node"]
+    "types": [
+      "vite/client",
+      "node"
+    ]
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
-    "tests/**/*.tsx",
-    "supabase/functions/**/*.ts"
+    "tests/**/*.tsx"
   ],
-  "exclude": ["node_modules", "dist", "build", "android", "ios"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "android",
+    "ios"
+  ]
 }
