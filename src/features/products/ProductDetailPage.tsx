@@ -25,6 +25,7 @@ import { confirmObservation } from '@services/api/confirmations';
 import { submitShelfObservation } from '@services/api/observations';
 import { createWatch } from '@services/api/watches';
 import { saveDeal } from '@services/api/savedDeals';
+import { saveShoppingItem } from '@services/api/shopping';
 import {
   getProduct,
   getProductHistory,
@@ -198,6 +199,20 @@ export function ProductDetailPage(): JSX.Element {
     }
   }
 
+  async function handleAddToList() {
+    if (!productId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await saveShoppingItem({ productId, quantity: 1, preferredWarehouseId: selected?.id ?? null });
+      setActionMessage('Added to your shopping list.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add to shopping list');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleShare() {
     if (!product) return;
     const text = state?.consensus_price_cents
@@ -312,6 +327,7 @@ export function ProductDetailPage(): JSX.Element {
                   <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
                     <IonButton onClick={() => setShowWatchModal(true)}>Watch</IonButton>
                     <IonButton fill="outline" onClick={handleSaveDeal} disabled={busy}>Save deal</IonButton>
+                    <IonButton fill="outline" onClick={handleAddToList} disabled={busy}>Add to list</IonButton>
                     <IonButton fill="outline" onClick={() => setShowConfirmModal(true)}>Verify price</IonButton>
                     <IonButton fill="outline" onClick={() => setShowChangeModal(true)}>Report change</IonButton>
                     <IonButton fill="outline" onClick={() => history.push(`/product/${productId}/buy`)}>Bought it</IonButton>
