@@ -80,6 +80,7 @@ export function AccountPage(): JSX.Element {
           <section className="cs-card">
             <h3 className="cs-strong" style={{ marginTop: 0 }}>Shopping</h3>
             <IonButton fill="outline" onClick={() => history.push('/trip')}>Open Trip Mode</IonButton>
+            <IonButton fill="outline" onClick={() => history.push('/notifications')}>Notifications</IonButton>
             {user && ['moderator', 'admin'].includes(user.role) && (
               <IonButton fill="outline" onClick={() => history.push('/admin')}>Moderator console</IonButton>
             )}
