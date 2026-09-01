@@ -14,6 +14,7 @@ import { AuthGate } from '@features/auth/AuthGate';
 import { TripPage } from '@features/trip/TripPage';
 import { AdminPage } from '@features/admin/AdminPage';
 import { NotificationsPage } from '@features/notifications/NotificationsPage';
+import { ReceiptImportPage } from '@features/receipts/ReceiptImportPage';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -47,6 +48,7 @@ export function App(): JSX.Element {
               <Route exact path="/trip" component={TripPage} />
               <Route exact path="/admin" component={AdminPage} />
               <Route exact path="/notifications" component={NotificationsPage} />
+              <Route exact path="/receipts/import" component={ReceiptImportPage} />
             </IonRouterOutlet>
             <AppShell />
           </IonTabs>
