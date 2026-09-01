@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { IonButton, IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
 import { currentUser, deleteAccount, exportAccount, signOut, type AuthUser } from '@services/api/auth';
+import { useHistory } from 'react-router';
 
 export function AccountPage(): JSX.Element {
+  const history = useHistory();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,14 @@ export function AccountPage(): JSX.Element {
               {user?.email ?? 'Loading…'}
             </div>
             {user?.displayName && <div className="cs-muted">{user.displayName}</div>}
+          </section>
+
+          <section className="cs-card">
+            <h3 className="cs-strong" style={{ marginTop: 0 }}>Shopping</h3>
+            <IonButton fill="outline" onClick={() => history.push('/trip')}>Open Trip Mode</IonButton>
+            {user && ['moderator', 'admin'].includes(user.role) && (
+              <IonButton fill="outline" onClick={() => history.push('/admin')}>Moderator console</IonButton>
+            )}
           </section>
 
           <section className="cs-card">
