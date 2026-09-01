@@ -264,6 +264,17 @@ CREATE INDEX IF NOT EXISTS idx_watches_user ON watches(user_id, created_at DESC)
 CREATE TRIGGER watches_updated_at BEFORE UPDATE ON watches
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+CREATE TABLE IF NOT EXISTS saved_deals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  warehouse_id uuid NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+  saved_price_cents bigint CHECK (saved_price_cents IS NULL OR saved_price_cents >= 0),
+  saved_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, product_id, warehouse_id)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_deals_user ON saved_deals(user_id, saved_at DESC);
+
 CREATE TABLE IF NOT EXISTS adjustment_candidates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -347,7 +358,7 @@ DECLARE
   table_name text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
-    'user_warehouses','receipts','purchases','watches','adjustment_candidates',
+    'user_warehouses','receipts','purchases','watches','saved_deals','adjustment_candidates',
     'notifications','device_tokens'
   ]
   LOOP
