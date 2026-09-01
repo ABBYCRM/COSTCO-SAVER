@@ -1,84 +1,54 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonChip, IonLabel } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
+import {
+  IonChip,
+  IonContent,
+  IonHeader,
+  IonLabel,
+  IonPage,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/react';
+import { useHistory } from 'react-router';
 import { useWarehouse } from '@stores/warehouse';
+import { listDeals, type DealRow } from '@services/api/deals';
 import { formatUSD, cents } from '@domain/money/cents';
 import { computeDealScore } from '@domain/deals/dealScore';
-import { classifyFreshness } from '@domain/freshness/freshnessEngine';
-import { first, type MaybeArray } from '@services/api/joins';
 import type { MarkdownClassification } from '@domain/pricing/priceCodeEngine';
 import type { FreshnessClass } from '@domain/freshness/freshnessEngine';
 
-interface DealRow {
-  product_id: string;
-  warehouse_id: string;
-  product_name: string;
-  brand: string | null;
-  consensus_price_cents: number | null;
-  markdown_class: string | null;
-  freshness_class: string;
-  confidence_score: number;
-  last_verified_at: string | null;
-}
-
-interface DealResponse {
-  product_id: string;
-  warehouse_id: string;
-  consensus_price_cents: number | null;
-  markdown_class: string | null;
-  freshness_class: string;
-  confidence_score: number;
-  last_verified_at: string | null;
-  products: MaybeArray<{ canonical_name: string; brand: string | null }>;
-}
+type Filter = 'all' | 'clearance' | 'manager_markdown' | 'asterisk';
 
 export function DealsPage(): JSX.Element {
+  const history = useHistory();
   const { selected } = useWarehouse();
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'clearance' | 'manager_markdown' | 'asterisk'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    supabase()
-      .from('warehouse_product_state')
-      .select('product_id, warehouse_id, consensus_price_cents, markdown_class, freshness_class, confidence_score, last_verified_at, products(canonical_name, brand)')
-      .eq('warehouse_id', selected.id)
-      .not('consensus_price_cents', 'is', null)
-      .order('confidence_score', { ascending: false })
-      .limit(50)
-      .then(({ data, error: err }) => {
+    listDeals(selected.id, filter)
+      .then((rows) => {
         if (cancelled) return;
-        if (err) {
-          setError(err.message);
-          setLoading(false);
-          return;
-        }
-        const rows: DealRow[] = (data ?? []).map((d: DealResponse) => {
-          const p = first(d.products);
-          return {
-            product_id: d.product_id,
-            warehouse_id: d.warehouse_id,
-            product_name: p?.canonical_name ?? 'Unknown product',
-            brand: p?.brand ?? null,
-            consensus_price_cents: d.consensus_price_cents,
-            markdown_class: d.markdown_class,
-            freshness_class: d.freshness_class,
-            confidence_score: d.confidence_score,
-            last_verified_at: d.last_verified_at,
-          };
-        });
         setDeals(rows);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setError(err.message);
         setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, filter]);
 
   if (!selected) {
     return (
@@ -91,13 +61,6 @@ export function DealsPage(): JSX.Element {
     );
   }
 
-  const filtered = deals.filter((d) => {
-    if (filter === 'all') return true;
-    if (filter === 'clearance') return d.markdown_class === 'clearance';
-    if (filter === 'manager_markdown') return d.markdown_class === 'manager_markdown';
-    return true;
-  });
-
   return (
     <IonPage>
       <IonHeader>
@@ -108,15 +71,16 @@ export function DealsPage(): JSX.Element {
       <IonContent fullscreen>
         <div className="cs-page">
           <div className="cs-row" style={{ flexWrap: 'wrap', gap: 'var(--cs-space-2)' }}>
-            <IonChip onClick={() => setFilter('all')} color={filter === 'all' ? 'primary' : undefined}>
-              <IonLabel>All</IonLabel>
-            </IonChip>
-            <IonChip onClick={() => setFilter('clearance')} color={filter === 'clearance' ? 'primary' : undefined}>
-              <IonLabel>Clearance .97</IonLabel>
-            </IonChip>
-            <IonChip onClick={() => setFilter('manager_markdown')} color={filter === 'manager_markdown' ? 'primary' : undefined}>
-              <IonLabel>Manager markdown</IonLabel>
-            </IonChip>
+            {([
+              ['all', 'All'],
+              ['clearance', 'Clearance .97'],
+              ['manager_markdown', 'Manager markdown'],
+              ['asterisk', 'Asterisk'],
+            ] as Array<[Filter, string]>).map(([value, label]) => (
+              <IonChip key={value} onClick={() => setFilter(value)} color={filter === value ? 'primary' : undefined}>
+                <IonLabel>{label}</IonLabel>
+              </IonChip>
+            ))}
           </div>
 
           {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
@@ -126,39 +90,48 @@ export function DealsPage(): JSX.Element {
               <div className="cs-skeleton" style={{ width: '40%' }} />
             </div>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && deals.length === 0 && (
             <div className="cs-empty">
-              <p>No verified prices at this warehouse yet.</p>
-              <p className="cs-muted">Be the first shopper to submit a verified shelf price.</p>
+              <p>No verified prices match this filter yet.</p>
               <button className="cs-button" onClick={() => location.assign('/scan')}>Scan a shelf</button>
             </div>
           )}
           <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {filtered.map((d) => {
+            {deals.map((deal) => {
               const score = computeDealScore({
-                currentPrice: d.consensus_price_cents ?? 0,
-                markdownClass: (d.markdown_class as MarkdownClassification | null) ?? null,
-                confidence: d.confidence_score,
-                freshnessClass: (d.freshness_class as FreshnessClass) ?? classifyFreshness(d.last_verified_at),
-                currentWarehousePrice: d.consensus_price_cents ?? 0,
+                currentPrice: deal.consensus_price_cents ?? 0,
+                markdownClass: (deal.markdown_class as MarkdownClassification | null) ?? null,
+                confidence: deal.confidence_score,
+                freshnessClass: deal.freshness_class as FreshnessClass,
+                currentWarehousePrice: deal.consensus_price_cents ?? 0,
               });
               return (
-                <li key={d.product_id} className="cs-card">
-                  <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                    <div>
-                      <div className="cs-strong">{d.product_name}</div>
-                      <div className="cs-muted">
-                        {d.brand && <>{d.brand} · </>}
-                        <span className="cs-pill cs-pill--verified">{d.freshness_class}</span>
+                <li key={deal.product_id}>
+                  <button
+                    className="cs-card"
+                    style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
+                    onClick={() => history.push(`/product/${deal.product_id}`)}
+                    aria-label={`Open ${deal.canonical_name}`}
+                  >
+                    <div className="cs-row" style={{ justifyContent: 'space-between' }}>
+                      <div>
+                        <div className="cs-strong">{deal.canonical_name}</div>
+                        <div className="cs-muted">
+                          {deal.brand && <>{deal.brand} · </>}
+                          <span className="cs-pill cs-pill--verified">{deal.freshness_class}</span>
+                          {deal.has_asterisk && <span className="cs-pill cs-pill--aging">asterisk</span>}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
+                          {deal.consensus_price_cents != null
+                            ? formatUSD(cents(deal.consensus_price_cents))
+                            : '—'}
+                        </div>
+                        <div className="cs-muted">{score.rating} · {score.score}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
-                        {d.consensus_price_cents ? formatUSD(cents(d.consensus_price_cents)) : '—'}
-                      </div>
-                      <div className="cs-muted">{score.rating} · {score.score}</div>
-                    </div>
-                  </div>
+                  </button>
                 </li>
               );
             })}
