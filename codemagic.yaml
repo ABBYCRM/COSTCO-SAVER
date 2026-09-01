@@ -1,0 +1,280 @@
+# COSTCO-SAVER — Codemagic CI/CD
+# Web/API deploy to DigitalOcean. Codemagic builds/distributes native Capacitor apps.
+#
+# Required secret groups:
+#   costco_saver_mobile:
+#     COSTCO_SAVER_API_BASE_URL=https://<digitalocean-app-domain>
+#   costco_saver_google:
+#     CM_KEYSTORE                 base64-encoded release JKS
+#     CM_KEYSTORE_PASSWORD
+#     CM_KEY_ALIAS
+#     CM_KEY_PASSWORD
+#     GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+#   costco_saver_apple:
+#     APP_STORE_CONNECT_ISSUER_ID
+#     APP_STORE_CONNECT_KEY_IDENTIFIER
+#     APP_STORE_CONNECT_PRIVATE_KEY
+#     CERTIFICATE_PRIVATE_KEY
+#
+# Production publishing is tag-only.
+
+workflows:
+  verify:
+    name: Verify web client
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22.11.0
+    scripts:
+      - name: Install locked dependencies
+        script: npm install --no-audit --no-fund
+      - name: Format
+        script: npm run format:check
+      - name: Lint
+        script: npm run lint
+      - name: Typecheck
+        script: npm run typecheck
+      - name: Unit tests
+        script: npm run test:unit
+      - name: Integration tests
+        script: npm run test:integration
+      - name: No-stub scan
+        script: npm run no-stub-scan
+      - name: Production web build
+        script: npm run build
+    artifacts:
+      - dist/**
+      - test-results/**
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: 20??-??-??/**
+          include: true
+
+  android-internal:
+    name: Android — Play Internal
+    instance_type: linux_x2
+    max_build_duration: 90
+    environment:
+      node: 22.11.0
+      java: 17
+      groups:
+        - costco_saver_mobile
+        - costco_saver_google
+      vars:
+        PACKAGE_NAME: com.costcosaver.app
+    scripts:
+      - name: Validate required environment
+        script: |
+          set -euo pipefail
+          : "${COSTCO_SAVER_API_BASE_URL:?COSTCO_SAVER_API_BASE_URL is required}"
+          : "${CM_KEYSTORE:?CM_KEYSTORE is required}"
+          : "${CM_KEYSTORE_PASSWORD:?CM_KEYSTORE_PASSWORD is required}"
+          : "${CM_KEY_ALIAS:?CM_KEY_ALIAS is required}"
+          : "${CM_KEY_PASSWORD:?CM_KEY_PASSWORD is required}"
+      - name: Install
+        script: npm install --no-audit --no-fund
+      - name: Quality gates
+        script: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:integration
+          npm run no-stub-scan
+      - name: Configure native API origin
+        script: |
+          cat > .env.production <<EOF
+          VITE_API_BASE_URL=${COSTCO_SAVER_API_BASE_URL}
+          VITE_BRAND_RETAILER_NAME=Costco
+          EOF
+      - name: Build web assets
+        script: npm run build
+      - name: Generate Android project
+        script: |
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
+      - name: Set Android version
+        script: |
+          VERSION_NAME="$(node -p "require('./package.json').version")"
+          VERSION_CODE="${BUILD_NUMBER}"
+          sed -i.bak -E "s/versionCode[[:space:]]+[0-9]+/versionCode ${VERSION_CODE}/" android/app/build.gradle
+          sed -i.bak -E "s/versionName[[:space:]]+\"[^\"]+\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
+          rm -f android/app/build.gradle.bak
+      - name: Build unsigned AAB
+        script: |
+          cd android
+          ./gradlew bundleRelease
+      - name: Sign AAB
+        script: |
+          set -euo pipefail
+          KEYSTORE_PATH="$CM_BUILD_DIR/costco-saver-release.jks"
+          printf '%s' "$CM_KEYSTORE" | base64 --decode > "$KEYSTORE_PATH"
+          AAB="$CM_BUILD_DIR/android/app/build/outputs/bundle/release/app-release.aab"
+          test -f "$AAB"
+          jarsigner             -sigalg SHA256withRSA             -digestalg SHA-256             -keystore "$KEYSTORE_PATH"             -storepass "$CM_KEYSTORE_PASSWORD"             -keypass "$CM_KEY_PASSWORD"             "$AAB" "$CM_KEY_ALIAS"
+          jarsigner -verify -verbose -certs "$AAB"
+          rm -f "$KEYSTORE_PATH"
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+      - android/app/build/outputs/**/mapping.txt
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+          include: true
+
+  ios-testflight:
+    name: iOS — TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      node: 22.11.0
+      xcode: latest
+      cocoapods: default
+      groups:
+        - costco_saver_mobile
+        - costco_saver_apple
+      vars:
+        BUNDLE_ID: com.costcosaver.app
+    scripts:
+      - name: Validate required environment
+        script: |
+          set -euo pipefail
+          : "${COSTCO_SAVER_API_BASE_URL:?COSTCO_SAVER_API_BASE_URL is required}"
+          : "${APP_STORE_CONNECT_ISSUER_ID:?APP_STORE_CONNECT_ISSUER_ID is required}"
+          : "${APP_STORE_CONNECT_KEY_IDENTIFIER:?APP_STORE_CONNECT_KEY_IDENTIFIER is required}"
+          : "${APP_STORE_CONNECT_PRIVATE_KEY:?APP_STORE_CONNECT_PRIVATE_KEY is required}"
+          : "${CERTIFICATE_PRIVATE_KEY:?CERTIFICATE_PRIVATE_KEY is required}"
+      - name: Install
+        script: npm install --no-audit --no-fund
+      - name: Quality gates
+        script: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:integration
+          npm run no-stub-scan
+      - name: Configure native API origin
+        script: |
+          cat > .env.production <<EOF
+          VITE_API_BASE_URL=${COSTCO_SAVER_API_BASE_URL}
+          VITE_BRAND_RETAILER_NAME=Costco
+          EOF
+      - name: Build web assets
+        script: npm run build
+      - name: Generate iOS project
+        script: |
+          rm -rf ios
+          npx cap add ios
+          npx cap sync ios
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Camera access is used to scan product barcodes and shelf price tags." ios/App/App/Info.plist ||           /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription Camera access is used to scan product barcodes and shelf price tags." ios/App/App/Info.plist
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+      - name: Initialize signing keychain
+        script: keychain initialize
+      - name: Fetch App Store signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID"             --type IOS_APP_STORE             --create
+      - name: Add signing certificate
+        script: keychain add-certificates
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Set build number
+        script: |
+          cd ios/App
+          agvtool new-version -all "$BUILD_NUMBER" ||           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa             --workspace "$CM_BUILD_DIR/ios/App/App.xcworkspace"             --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+          include: true
+
+  release-candidate:
+    name: Release Candidate — cross-platform source verification
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22.11.0
+      groups:
+        - costco_saver_mobile
+    scripts:
+      - name: Install
+        script: npm install --no-audit --no-fund
+      - name: Full source verification
+        script: |
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:integration
+          npm run no-stub-scan
+      - name: Configure production API
+        script: |
+          echo "VITE_API_BASE_URL=${COSTCO_SAVER_API_BASE_URL}" > .env.production
+      - name: Build
+        script: npm run build
+    artifacts:
+      - dist/**
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+-rc*'
+          include: true
+
+  production:
+    name: Production release source gate
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22.11.0
+      groups:
+        - costco_saver_mobile
+    scripts:
+      - name: Install
+        script: npm install --no-audit --no-fund
+      - name: Verify immutable release source
+        script: |
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:integration
+          npm run no-stub-scan
+          echo "VITE_API_BASE_URL=${COSTCO_SAVER_API_BASE_URL}" > .env.production
+          npm run build
+    artifacts:
+      - dist/**
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v[0-9]+.[0-9]+.[0-9]+'
+          include: true

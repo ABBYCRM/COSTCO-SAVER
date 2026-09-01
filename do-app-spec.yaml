@@ -1,0 +1,82 @@
+{
+  "name": "costco-saver",
+  "region": "nyc",
+  "services": [
+    {
+      "name": "costco-saver-web",
+      "http_port": 8080,
+      "instance_count": 1,
+      "instance_size_slug": "basic-xxs",
+      "build_command": "npm install --no-audit --no-fund && npm run build",
+      "run_command": "npm start",
+      "source_dir": "/",
+      "github": {
+        "repo": "ABBYCRM/COSTCO-SAVER",
+        "branch": "main",
+        "deploy_on_push": true
+      },
+      "health_check": {
+        "http_path": "/api/v1/health",
+        "port": 8080,
+        "initial_delay_seconds": 20,
+        "period_seconds": 20,
+        "timeout_seconds": 5,
+        "failure_threshold": 3,
+        "success_threshold": 1
+      },
+      "envs": [
+        {
+          "key": "NODE_ENV",
+          "value": "production",
+          "scope": "RUN_TIME",
+          "type": "GENERAL"
+        },
+        {
+          "key": "DATABASE_URL",
+          "value": "${db.DATABASE_URL}",
+          "scope": "RUN_TIME",
+          "type": "GENERAL"
+        },
+        {
+          "key": "JWT_SECRET",
+          "value": "${JWT_SECRET}",
+          "scope": "RUN_TIME",
+          "type": "SECRET"
+        }
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "db-migrate",
+      "kind": "PRE_DEPLOY",
+      "instance_size_slug": "basic-xxs",
+      "build_command": "npm install --no-audit --no-fund",
+      "run_command": "npm run db:migrate",
+      "source_dir": "/",
+      "github": {
+        "repo": "ABBYCRM/COSTCO-SAVER",
+        "branch": "main",
+        "deploy_on_push": true
+      },
+      "envs": [
+        {
+          "key": "DATABASE_URL",
+          "value": "${db.DATABASE_URL}",
+          "scope": "RUN_TIME",
+          "type": "GENERAL"
+        }
+      ]
+    }
+  ],
+  "databases": [
+    {
+      "engine": "PG",
+      "name": "db",
+      "version": "16"
+    }
+  ],
+  "workers": [],
+  "functions": [],
+  "static_sites": []
+}
