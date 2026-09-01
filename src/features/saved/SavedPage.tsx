@@ -128,6 +128,10 @@ export function SavedPage(): JSX.Element {
       </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
+          <div className="cs-row" style={{ marginBottom: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
+            <IonButton size="small" fill="outline" onClick={() => history.push('/receipts/import')}>Import receipt</IonButton>
+            <IonButton size="small" fill="outline" onClick={() => history.push('/trip')}>Trip Mode</IonButton>
+          </div>
           <IonSegment value={section} onIonChange={(e) => setSection(e.detail.value as Section)}>
             <IonSegmentButton value="watching"><IonLabel>Watching</IonLabel></IonSegmentButton>
             <IonSegmentButton value="purchases"><IonLabel>Purchases</IonLabel></IonSegmentButton>
