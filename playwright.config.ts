@@ -1,22 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * COSTCO-SAVER Playwright config.
- *
- * - E2E runs against a real running web app (vite preview of the production build)
- * - The RLS/security suite spins up two distinct browser contexts to assert
- *   multi-user isolation (per spec §50).
- * - Strict: NO waitForTimeout, NO production API, NO test-order dependency.
- */
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : 'list',
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:4173',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -27,23 +19,23 @@ export default defineConfig({
     {
       name: 'chromium-isolation',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /tests\/e2e\/security.*\.spec\.ts/,
+      testMatch: /security-isolation\.spec\.ts/,
     },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /tests\/e2e\/.*\.spec\.ts/,
+      testIgnore: /security-isolation\.spec\.ts/,
     },
     {
       name: 'mobile-iphone13',
       use: { ...devices['iPhone 13'] },
-      testMatch: /tests\/e2e\/.*\.spec\.ts/,
+      testIgnore: /security-isolation\.spec\.ts/,
     },
   ],
   webServer: {
-    command: 'npm run preview -- --port 4173 --strictPort',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
+    command: 'npm start',
+    url: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8080/api/v1/health',
+    reuseExistingServer: true,
     timeout: 60_000,
   },
 });
