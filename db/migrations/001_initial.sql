@@ -118,8 +118,10 @@ CREATE TABLE IF NOT EXISTS evidence (
   owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind text NOT NULL CHECK (kind IN ('shelf_photo','receipt_image','receipt_pdf','product_photo','other')),
   storage_key text NOT NULL,
+  content_type text,
   content_hash text,
   byte_size integer,
+  uploaded_at timestamptz,
   moderation_state text NOT NULL DEFAULT 'pending' CHECK (moderation_state IN ('pending','approved','rejected','quarantined')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
