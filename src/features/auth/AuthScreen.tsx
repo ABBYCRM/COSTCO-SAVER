@@ -1,15 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
+import { signIn, signUp } from '@services/api/auth';
 
 interface AuthScreenProps {
   onSignedIn: () => void;
 }
 
-/**
- * Real email/password auth against Supabase. No demo creds, no fake buttons.
- * Apple and Google sign-in are added in the Phase 2 build per spec §49.
- */
 export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,27 +13,19 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
     setError(null);
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const { error: signUpErr } = await supabase().auth.signUp({
-          email: email.trim(),
-          password,
-        });
-        if (signUpErr) throw signUpErr;
+        await signUp(email.trim(), password);
       } else {
-        const { error: signInErr } = await supabase().auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInErr) throw signInErr;
+        await signIn(email.trim(), password);
       }
       onSignedIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setBusy(false);
     }
@@ -66,11 +54,14 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
                 type="password"
                 autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 value={password}
-                minlength={8}
+                minlength={10}
                 onIonChange={(e) => setPassword(e.detail.value ?? '')}
                 required
               />
             </IonItem>
+            {mode === 'signup' && (
+              <p className="cs-muted">Use at least 10 characters. Your password is hashed before storage.</p>
+            )}
             {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
             <IonButton type="submit" expand="block" disabled={busy}>
               {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
