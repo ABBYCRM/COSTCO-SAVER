@@ -41,6 +41,14 @@ export async function transaction(fn) {
 export async function userTransaction(userId, fn) {
   return transaction(async (client) => {
     await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+    await client.query("SELECT set_config('app.internal', 'false', true)");
+    return fn(client);
+  });
+}
+
+export async function internalTransaction(fn) {
+  return transaction(async (client) => {
+    await client.query("SELECT set_config('app.internal', 'true', true)");
     return fn(client);
   });
 }
