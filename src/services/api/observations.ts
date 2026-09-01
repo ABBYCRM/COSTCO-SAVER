@@ -8,6 +8,7 @@ export interface SubmitObservationInput {
   idempotencyKey: string;
   sourceType?: 'shelf_scan' | 'manual_shelf_entry' | 'receipt' | 'correction';
   observedAt?: string;
+  evidenceId?: string | null;
 }
 
 export interface SubmitObservationResult {
