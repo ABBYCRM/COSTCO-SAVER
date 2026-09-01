@@ -1,4 +1,4 @@
-import { supabase } from '@services/supabase/client';
+import { apiFetch } from './client';
 
 export interface AdjustmentRow {
   id: string;
@@ -14,18 +14,21 @@ export interface AdjustmentRow {
   window_end: string;
   days_remaining: number;
   status: 'tracking' | 'opportunity' | 'claimed' | 'denied' | 'expired' | 'dismissed';
+  canonical_name?: string;
+  warehouse_name?: string;
 }
 
 export async function listAdjustments(): Promise<AdjustmentRow[]> {
-  const { data, error } = await supabase()
-    .from('adjustment_candidates')
-    .select('id, purchase_id, product_id, warehouse_id, purchase_price_cents, new_price_cents, quantity, potential_savings_cents, purchase_date, price_drop_date, window_end, days_remaining, status')
-    .order('window_end', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as AdjustmentRow[];
+  const result = await apiFetch<{ adjustments: AdjustmentRow[] }>('/api/v1/adjustments');
+  return result.adjustments;
 }
 
-export async function setAdjustmentStatus(id: string, status: AdjustmentRow['status']): Promise<void> {
-  const { error } = await supabase().from('adjustment_candidates').update({ status }).eq('id', id);
-  if (error) throw error;
+export async function setAdjustmentStatus(
+  id: string,
+  status: AdjustmentRow['status'],
+): Promise<void> {
+  await apiFetch(`/api/v1/adjustments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
