@@ -24,6 +24,7 @@ import {
   searchProducts,
 } from '@services/api/search';
 import { submitShelfObservation } from '@services/api/observations';
+import { uploadEvidence } from '@services/api/media';
 
 type ScanMode = 'barcode' | 'shelf_tag';
 
@@ -46,6 +47,7 @@ export function ScanPage(): JSX.Element {
   const [newProductName, setNewProductName] = useState('');
   const [newProductBrand, setNewProductBrand] = useState('');
   const [hasAsterisk, setHasAsterisk] = useState(false);
+  const [shelfPhoto, setShelfPhoto] = useState<File | null>(null);
   const [resolvedProduct, setResolvedProduct] = useState<ResolvedProduct | null>(null);
   const [unknownBarcodeType, setUnknownBarcodeType] = useState<BarcodeKind | null>(null);
   const [busy, setBusy] = useState(false);
@@ -153,6 +155,7 @@ export function ScanPage(): JSX.Element {
         if (!Number.isFinite(price) || price <= 0) {
           throw new Error('Enter a valid shelf price.');
         }
+        const evidence = shelfPhoto ? await uploadEvidence(shelfPhoto, 'shelf_photo') : null;
         await submitShelfObservation({
           productId: product.id,
           warehouseId: selected.id,
@@ -160,6 +163,7 @@ export function ScanPage(): JSX.Element {
           hasAsterisk,
           idempotencyKey: crypto.randomUUID(),
           sourceType: 'manual_shelf_entry',
+          evidenceId: evidence?.id ?? null,
         });
       }
       history.push(`/product/${product.id}`);
@@ -196,6 +200,7 @@ export function ScanPage(): JSX.Element {
 
       const priceCents = fromMajorUnits(priceMajor) as number;
       const classification = classifyPriceCode({ priceCents: cents(priceCents), hasAsterisk });
+      const evidence = shelfPhoto ? await uploadEvidence(shelfPhoto, 'shelf_photo') : null;
       await submitShelfObservation({
         productId: product.id,
         warehouseId: selected.id,
@@ -203,6 +208,7 @@ export function ScanPage(): JSX.Element {
         hasAsterisk,
         idempotencyKey: crypto.randomUUID(),
         sourceType: 'manual_shelf_entry',
+        evidenceId: evidence?.id ?? null,
       });
       setLastResult(
         `Recorded ${formatUSD(cents(priceCents))} at ${selected.name} · ${classification.classification}`,
@@ -346,6 +352,17 @@ export function ScanPage(): JSX.Element {
                   value={manualPrice}
                   onIonChange={(e) => setManualPrice(e.detail.value ?? '')}
                   placeholder="e.g. 19.97"
+                />
+              </IonItem>
+              <IonItem>
+                <IonLabel position="stacked">Shelf-tag photo (optional)</IonLabel>
+                <input
+                  aria-label="Shelf-tag photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  onChange={(event) => setShelfPhoto(event.currentTarget.files?.[0] ?? null)}
+                  style={{ padding: '12px 0', width: '100%' }}
                 />
               </IonItem>
               <IonItem>
