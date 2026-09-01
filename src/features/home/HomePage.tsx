@@ -1,40 +1,24 @@
-import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonRefresher, IonRefresherContent } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  IonContent,
+  IonHeader,
+  IonPage,
+  IonRefresher,
+  IonRefresherContent,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/react';
 import { listWarehouses, type WarehouseRow } from '@services/api/warehouses';
+import { listPriceEvents, type PriceEvent } from '@services/api/events';
 import { useWarehouse } from '@stores/warehouse';
 import { WarehousePicker } from '@features/warehouses/WarehousePicker';
 import { CoverageCard } from '@features/warehouses/CoverageCard';
 import { formatUSD, cents } from '@domain/money/cents';
-import { first, type MaybeArray } from '@services/api/joins';
-
-interface DropResponse {
-  product_id: string;
-  warehouse_id: string;
-  old_price_cents: number | null;
-  new_price_cents: number;
-  effective_at: string;
-  products: MaybeArray<{ canonical_name: string; brand: string | null }>;
-  warehouses: MaybeArray<{ name: string }>;
-}
-
-interface DropRow {
-  product_id: string;
-  product_name: string;
-  brand: string | null;
-  warehouse_id: string;
-  warehouse_name: string;
-  old_price_cents: number;
-  new_price_cents: number;
-  effective_at: string;
-  markdown_class: string | null;
-  freshness_class: string;
-}
 
 export function HomePage(): JSX.Element {
   const { selected, setSelected } = useWarehouse();
   const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
-  const [drops, setDrops] = useState<DropRow[]>([]);
+  const [drops, setDrops] = useState<PriceEvent[]>([]);
   const [loadingDrops, setLoadingDrops] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -50,76 +34,25 @@ export function HomePage(): JSX.Element {
       });
   }, [selected, setSelected]);
 
-  useEffect(() => {
+  const loadDrops = useCallback(async () => {
     if (!selected) return;
-    let cancelled = false;
     setLoadingDrops(true);
-    supabase()
-      .from('price_events')
-      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name)')
-      .eq('warehouse_id', selected.id)
-      .eq('event_type', 'price_drop')
-      .order('effective_at', { ascending: false })
-      .limit(20)
-      .then(({ data, error: err }) => {
-        if (cancelled) return;
-        if (err) {
-          setError(err.message);
-          setLoadingDrops(false);
-          return;
-        }
-        const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
-          const p = first(d.products);
-          const w = first(d.warehouses);
-          return {
-            product_id: d.product_id,
-            product_name: p?.canonical_name ?? 'Unknown product',
-            brand: p?.brand ?? null,
-            warehouse_id: d.warehouse_id,
-            warehouse_name: w?.name ?? selected.name,
-            old_price_cents: d.old_price_cents ?? 0,
-            new_price_cents: d.new_price_cents,
-            effective_at: d.effective_at,
-            markdown_class: null,
-            freshness_class: 'RECENT',
-          };
-        });
-        setDrops(rows);
-        setLoadingDrops(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setError(null);
+    try {
+      setDrops(await listPriceEvents(selected.id, 'price_drop'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load price drops');
+    } finally {
+      setLoadingDrops(false);
+    }
   }, [selected]);
 
+  useEffect(() => {
+    void loadDrops();
+  }, [loadDrops]);
+
   const doRefresh = async (event?: CustomEvent) => {
-    if (!selected) return;
-    const { data, error: err } = await supabase()
-      .from('price_events')
-      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name)')
-      .eq('warehouse_id', selected.id)
-      .eq('event_type', 'price_drop')
-      .order('effective_at', { ascending: false })
-      .limit(20);
-    if (!err) {
-      const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
-        const p = first(d.products);
-        const w = first(d.warehouses);
-        return {
-          product_id: d.product_id,
-          product_name: p?.canonical_name ?? 'Unknown product',
-          brand: p?.brand ?? null,
-          warehouse_id: d.warehouse_id,
-          warehouse_name: w?.name ?? selected.name,
-          old_price_cents: d.old_price_cents ?? 0,
-          new_price_cents: d.new_price_cents,
-          effective_at: d.effective_at,
-          markdown_class: null,
-          freshness_class: 'RECENT',
-        };
-      });
-      setDrops(rows);
-    }
+    await loadDrops();
     (event?.detail as { complete?: () => void } | undefined)?.complete?.();
   };
 
@@ -150,7 +83,11 @@ export function HomePage(): JSX.Element {
             </div>
           </section>
 
-          {selected && <div style={{ marginTop: 'var(--cs-space-3)' }}><CoverageCard warehouseId={selected.id} /></div>}
+          {selected && (
+            <div style={{ marginTop: 'var(--cs-space-3)' }}>
+              <CoverageCard warehouseId={selected.id} />
+            </div>
+          )}
 
           <section style={{ marginTop: 'var(--cs-space-5)' }}>
             <h2 className="cs-section-title">Recent price drops</h2>
@@ -169,22 +106,23 @@ export function HomePage(): JSX.Element {
               </div>
             )}
             <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {drops.map((d) => (
-                <li key={`${d.product_id}-${d.effective_at}`} className="cs-card">
+              {drops.map((drop) => (
+                <li key={drop.id} className="cs-card">
                   <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                     <div>
-                      <div className="cs-strong">{d.product_name}</div>
-                      {d.brand && <div className="cs-muted">{d.brand}</div>}
+                      <div className="cs-strong">{drop.product_name}</div>
+                      {drop.brand && <div className="cs-muted">{drop.brand}</div>}
+                      <div className="cs-muted">{drop.warehouse_name} · {new Date(drop.effective_at).toLocaleString()}</div>
                     </div>
-                    <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
-                      {formatUSD(cents(d.new_price_cents))}
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
+                        {formatUSD(cents(drop.new_price_cents))}
+                      </div>
+                      {drop.old_price_cents != null && (
+                        <div className="cs-muted">was {formatUSD(cents(drop.old_price_cents))}</div>
+                      )}
                     </div>
                   </div>
-                  {d.old_price_cents > 0 && (
-                    <div className="cs-muted cs-price" style={{ marginTop: 'var(--cs-space-1)' }}>
-                      was {formatUSD(cents(d.old_price_cents))}
-                    </div>
-                  )}
                 </li>
               ))}
             </ul>
@@ -195,8 +133,8 @@ export function HomePage(): JSX.Element {
           isOpen={showPicker}
           warehouses={warehouses}
           onDismiss={() => setShowPicker(false)}
-          onSelect={(w) => {
-            setSelected(w);
+          onSelect={(warehouse) => {
+            setSelected(warehouse);
             setShowPicker(false);
           }}
         />
