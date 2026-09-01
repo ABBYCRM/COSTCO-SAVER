@@ -1,190 +1,131 @@
-/**
- * Multi-user isolation tests.
- *
- * These tests use the @supabase/supabase-js client against a local Supabase
- * instance, and assert that the RLS policies from the migration block
- * cross-user access for every private table (spec §47, §50, §81).
- *
- * The tests require `supabase start` to be running. They are skipped in
- * environments where SUPABASE_URL is not set, with a clear log line.
- */
+import { describe, expect, it } from 'vitest';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+const API = process.env.TEST_API_URL ?? '';
+const ENABLED = Boolean(API);
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
-const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? '';
-const ENABLED = Boolean(SUPABASE_URL && ANON_KEY);
-
-let userA: SupabaseClient;
-let userB: SupabaseClient;
-
-interface SignupResult {
-  email: string;
-  password: string;
-  userId: string;
+interface Session {
   accessToken: string;
+  user: { id: string; email: string };
 }
 
-async function signupUser(suffix: string): Promise<SignupResult> {
-  const email = `isolation-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@costco-saver.test`;
-  const password = 'Costco-saver-test-123!';
-  const c = createClient(SUPABASE_URL, ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
+async function signup(label: string): Promise<Session> {
+  const email = `security-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
+  const response = await fetch(`${API}/api/v1/auth/signup`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Security-test-123!' }),
   });
-  const { data, error } = await c.auth.signUp({ email, password });
-  if (error) throw error;
-  if (!data.session) throw new Error('No session returned for test signup');
-  return {
-    email,
-    password,
-    userId: data.user!.id,
-    accessToken: data.session.access_token,
-  };
+  expect(response.status).toBe(201);
+  return (await response.json()) as Session;
 }
 
-const describeMaybe = ENABLED ? describe : describe.skip;
+async function api<T>(
+  session: Session,
+  path: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: T }> {
+  const headers = new Headers(init.headers);
+  headers.set('authorization', `Bearer ${session.accessToken}`);
+  if (init.body) headers.set('content-type', 'application/json');
+  const response = await fetch(`${API}${path}`, { ...init, headers });
+  let body = {} as T;
+  try {
+    body = (await response.json()) as T;
+  } catch {
+    // no-op
+  }
+  return { status: response.status, body };
+}
 
-describeMaybe('multi-user RLS isolation', () => {
-  let a: SignupResult;
-  let b: SignupResult;
+const describeApi = ENABLED ? describe : describe.skip;
 
-  beforeAll(async () => {
-    if (!ENABLED) return;
-    a = await signupUser('A');
-    b = await signupUser('B');
-    userA = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${a.accessToken}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    userB = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${b.accessToken}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-  }, 30_000);
+describeApi('DigitalOcean API multi-user isolation', () => {
+  it('prevents User B from deleting or listing User A purchase', async () => {
+    const [a, b] = await Promise.all([signup('a-purchase'), signup('b-purchase')]);
 
-  afterAll(async () => {
-    if (!ENABLED) return;
-    // Best-effort cleanup via service role would be ideal; without it, the
-    // test database will accumulate isolated test users. That's acceptable
-    // because the test IDs are random.
-  });
-
-  it('User B cannot read User A purchases', async () => {
-    // Insert a purchase as A (assumes products + warehouses seed data exists)
-    const { data: product } = await userA.from('products').select('id').limit(1).single();
-    const { data: warehouse } = await userA.from('warehouses').select('id').limit(1).single();
-    if (!product || !warehouse) {
-      console.warn('seed data missing — skipping purchase insert');
-      return;
-    }
-    const { data: purchase, error: insertErr } = await userA
-      .from('purchases')
-      .insert({
-        product_id: product.id,
-        warehouse_id: warehouse.id,
-        purchase_date: new Date().toISOString(),
-        unit_price_cents: 1999,
+    const created = await api<{ purchase: { id: string } }>(a, '/api/v1/purchases', {
+      method: 'POST',
+      body: JSON.stringify({
+        productId: '20000000-0000-4000-8000-000000000001',
+        warehouseId: '10000000-0000-4000-8000-000000000001',
+        unitPriceCents: 2999,
         quantity: 1,
-        discount_cents: 0,
-        total_cents: 1999,
-        currency: 'USD',
+        purchaseDate: new Date().toISOString(),
         source: 'manual',
-      })
-      .select('id')
-      .single();
-    expect(insertErr).toBeNull();
-    expect(purchase?.id).toBeTruthy();
+      }),
+    });
+    expect(created.status).toBe(201);
+    const purchaseId = created.body.purchase.id;
 
-    // B tries to read A's purchase directly
-    const { data: bReads, error: bReadErr } = await userB
-      .from('purchases')
-      .select('*')
-      .eq('id', purchase!.id);
-    expect(bReadErr).toBeNull();
-    expect(bReads ?? []).toHaveLength(0);
+    const bList = await api<{ purchases: Array<{ id: string }> }>(b, '/api/v1/purchases');
+    expect(bList.status).toBe(200);
+    expect(bList.body.purchases.some((row) => row.id === purchaseId)).toBe(false);
 
-    // B tries to update A's purchase
-    const { data: bUpdates, error: bUpdErr } = await userB
-      .from('purchases')
-      .update({ unit_price_cents: 1 })
-      .eq('id', purchase!.id)
-      .select();
-    expect(bUpdErr).toBeNull();
-    expect((bUpdates ?? []).length).toBe(0);
+    const bDelete = await api<{ error?: unknown }>(b, `/api/v1/purchases/${purchaseId}`, {
+      method: 'DELETE',
+    });
+    expect(bDelete.status).toBe(404);
 
-    // B tries to delete A's purchase
-    const { error: bDelErr } = await userB
-      .from('purchases')
-      .delete()
-      .eq('id', purchase!.id);
-    expect(bDelErr).toBeNull();
+    const aList = await api<{ purchases: Array<{ id: string }> }>(a, '/api/v1/purchases');
+    expect(aList.body.purchases.some((row) => row.id === purchaseId)).toBe(true);
+  });
 
-    // A can still read it
-    const { data: aReads } = await userA.from('purchases').select('*').eq('id', purchase!.id);
-    expect((aReads ?? []).length).toBe(1);
-  }, 30_000);
+  it('prevents User B from deleting User A watch', async () => {
+    const [a, b] = await Promise.all([signup('a-watch'), signup('b-watch')]);
+    const created = await api<{ watch: { id: string } }>(a, '/api/v1/watches', {
+      method: 'POST',
+      body: JSON.stringify({
+        productId: '20000000-0000-4000-8000-000000000001',
+        warehouseId: '10000000-0000-4000-8000-000000000001',
+        notifyAnyDrop: true,
+      }),
+    });
+    expect(created.status).toBe(201);
+    const watchId = created.body.watch.id;
 
-  it('User B cannot read User A watches', async () => {
-    const { data: product } = await userA.from('products').select('id').limit(1).single();
-    if (!product) {
-      console.warn('seed data missing — skipping watch test');
-      return;
+    const bDelete = await api(b, `/api/v1/watches/${watchId}`, { method: 'DELETE' });
+    expect(bDelete.status).toBe(404);
+
+    const aList = await api<{ watches: Array<{ id: string }> }>(a, '/api/v1/watches');
+    expect(aList.body.watches.some((row) => row.id === watchId)).toBe(true);
+  });
+
+  it('isolates receipts and exports', async () => {
+    const [a, b] = await Promise.all([signup('a-receipt'), signup('b-receipt')]);
+    const created = await api<{ receipt: { id: string } }>(a, '/api/v1/receipts', {
+      method: 'POST',
+      body: JSON.stringify({
+        warehouseId: '10000000-0000-4000-8000-000000000001',
+        purchaseDate: new Date().toISOString(),
+        totalCents: 4599,
+      }),
+    });
+    expect(created.status).toBe(201);
+    const receiptId = created.body.receipt.id;
+
+    const bReceipts = await api<{ receipts: Array<{ id: string }> }>(b, '/api/v1/receipts');
+    expect(bReceipts.body.receipts.some((row) => row.id === receiptId)).toBe(false);
+
+    const bExport = await api<{ receipts: Array<{ id: string }> }>(b, '/api/v1/me/export');
+    expect(bExport.status).toBe(200);
+    expect(bExport.body.receipts.some((row) => row.id === receiptId)).toBe(false);
+
+    const aExport = await api<{ receipts: Array<{ id: string }> }>(a, '/api/v1/me/export');
+    expect(aExport.body.receipts.some((row) => row.id === receiptId)).toBe(true);
+  });
+
+  it('requires authentication for all private resources', async () => {
+    for (const path of [
+      '/api/v1/purchases',
+      '/api/v1/watches',
+      '/api/v1/adjustments',
+      '/api/v1/notifications',
+      '/api/v1/receipts',
+      '/api/v1/saved-deals',
+      '/api/v1/me/export',
+    ]) {
+      const response = await fetch(`${API}${path}`);
+      expect(response.status, path).toBe(401);
     }
-    const { data: watch } = await userA
-      .from('watches')
-      .insert({
-        product_id: product.id,
-        notify_any_drop: true,
-      })
-      .select('id')
-      .single();
-    expect(watch?.id).toBeTruthy();
-
-    const { data: bReads } = await userB
-      .from('watches')
-      .select('*')
-      .eq('id', watch!.id);
-    expect((bReads ?? []).length).toBe(0);
-  }, 30_000);
-
-  it('User B cannot read User A receipts', async () => {
-    const { data: warehouse } = await userA.from('warehouses').select('id').limit(1).single();
-    if (!warehouse) {
-      console.warn('seed data missing — skipping receipt test');
-      return;
-    }
-    const { data: receipt } = await userA
-      .from('receipts')
-      .insert({
-        warehouse_id: warehouse.id,
-        purchase_date: new Date().toISOString(),
-        ocr_status: 'pending',
-        status: 'pending',
-      })
-      .select('id')
-      .single();
-    expect(receipt?.id).toBeTruthy();
-
-    const { data: bReads } = await userB
-      .from('receipts')
-      .select('*')
-      .eq('id', receipt!.id);
-    expect((bReads ?? []).length).toBe(0);
-  }, 30_000);
-
-  it('User B cannot read User A private evidence (storage path)', async () => {
-    // We do not upload; we just verify the policy denies access to a guessed
-    // path under A's user_id.
-    const guessedPath = `${a.userId}/some-receipt.jpg`;
-    const { data, error } = await userB.storage
-      .from('private-receipts')
-      .download(guessedPath);
-    // Either the download returns null, OR throws; both prove the policy
-    // blocked access.
-    expect(Boolean(data)).toBe(false);
-    // The error object is allowed to be null because Supabase returns 400
-    // with `data: null`; the absence of data is the proof.
-    void error;
-  }, 30_000);
+  });
 });
