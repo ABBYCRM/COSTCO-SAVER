@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { getObject, newStorageKey, putObject } from './storage.mjs';
 import { pool, query, userTransaction, internalTransaction } from './db.mjs';
 import {
   hashPassword,
@@ -903,6 +904,79 @@ async function registerDevice(req, res) {
   sendJson(res, 201, { id: result.rows[0].id });
 }
 
+async function createMediaRecord(req, res) {
+  const user=requireUser(req);
+  const body=await readJson(req);
+  const kind=requireString(body.kind,'kind',2,40);
+  if(!['shelf_photo','receipt_image','receipt_pdf','product_photo','other'].includes(kind)){
+    throw Object.assign(new Error('Invalid media kind'),{status:400});
+  }
+  const fileName=requireString(body.fileName||'upload.bin','fileName',1,160);
+  const contentType=requireString(body.contentType||'application/octet-stream','contentType',3,120);
+  const allowed=new Set(['image/jpeg','image/png','image/webp','application/pdf']);
+  if(!allowed.has(contentType)) throw Object.assign(new Error('Unsupported media type'),{status:415});
+  const storageKey=newStorageKey(user.sub,kind,fileName);
+  const result=await userTransaction(user.sub,(client)=>
+    client.query(
+      `INSERT INTO evidence(owner_user_id,kind,storage_key,content_type,moderation_state)
+       VALUES($1,$2,$3,$4,'pending')
+       RETURNING id,kind,content_type,created_at`,
+      [user.sub,kind,storageKey,contentType]
+    )
+  );
+  sendJson(res,201,{evidence:result.rows[0],uploadUrl:`/api/v1/media/${result.rows[0].id}/content`});
+}
+
+async function uploadMedia(req,res,id){
+  const user=requireUser(req);
+  const length=Number(req.headers['content-length']||0);
+  if(!Number.isFinite(length)||length<=0||length>15*1024*1024){
+    throw Object.assign(new Error('Media must be between 1 byte and 15 MB'),{status:413});
+  }
+  const row=await userTransaction(user.sub,(client)=>
+    client.query('SELECT id,storage_key,content_type FROM evidence WHERE id=$1 AND owner_user_id=$2',[id,user.sub])
+  );
+  if(!row.rows[0]) throw Object.assign(new Error('Media record not found'),{status:404});
+  const media=row.rows[0];
+  const contentType=String(req.headers['content-type']||media.content_type||'application/octet-stream');
+  if(contentType!==media.content_type) throw Object.assign(new Error('Content type does not match media record'),{status:400});
+  await putObject({key:media.storage_key,body:req,contentType,contentLength:length});
+  await userTransaction(user.sub,(client)=>
+    client.query('UPDATE evidence SET byte_size=$1,uploaded_at=now() WHERE id=$2 AND owner_user_id=$3',[length,id,user.sub])
+  );
+  sendJson(res,200,{uploaded:true,evidenceId:id});
+}
+
+async function downloadMedia(req,res,id){
+  const user=requireUser(req);
+  const row=await userTransaction(user.sub,(client)=>
+    client.query(
+      `SELECT e.id,e.storage_key,e.content_type,e.byte_size
+       FROM evidence e
+       WHERE e.id=$1 AND (
+         e.owner_user_id=$2
+         OR EXISTS (
+           SELECT 1 FROM price_observations po
+           WHERE po.evidence_id=e.id AND po.verification_status='verified'
+         )
+       )`,
+      [id,user.sub]
+    )
+  );
+  if(!row.rows[0]) throw Object.assign(new Error('Media not found'),{status:404});
+  const media=row.rows[0];
+  const object=await getObject(media.storage_key);
+  res.writeHead(200,{
+    'content-type':object.ContentType||media.content_type||'application/octet-stream',
+    'content-length':String(object.ContentLength||media.byte_size||0),
+    'cache-control':'private, max-age=60',
+    'x-content-type-options':'nosniff'
+  });
+  if(object.Body&&typeof object.Body.pipe==='function') object.Body.pipe(res);
+  else if(object.Body) res.end(Buffer.from(await object.Body.transformToByteArray()));
+  else res.end();
+}
+
 async function createReceipt(req, res) {
   const user = requireUser(req);
   const body = await readJson(req);
@@ -1221,6 +1295,7 @@ async function routeApi(req, res, url, rid) {
   if (method === 'POST' && pathname === '/api/v1/device-tokens') return registerDevice(req, res);
   if (method === 'GET' && pathname === '/api/v1/receipts') return listReceipts(req, res);
   if (method === 'POST' && pathname === '/api/v1/receipts') return createReceipt(req, res);
+  if (method === 'POST' && pathname === '/api/v1/media') return createMediaRecord(req, res);
   if (method === 'POST' && pathname === '/api/v1/reports') return createReport(req, res);
   if (method === 'GET' && pathname === '/api/v1/shopping-list') return listShoppingList(req, res);
   if (method === 'POST' && pathname === '/api/v1/shopping-list') return upsertShoppingItem(req, res);
