@@ -194,6 +194,58 @@ async function listWarehouses(res, url) {
   sendJson(res, 200, { warehouses: result.rows });
 }
 
+async function warehouseHealth(res, warehouseId) {
+  if (!uuid(warehouseId)) throw Object.assign(new Error('Invalid warehouse id'), { status: 400 });
+  const result = await query(
+    `WITH state_stats AS (
+       SELECT count(*)::int AS active_observed_products,
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (now()-last_verified_at))/3600.0
+              ),0)::float8 AS median_observation_age_hours
+       FROM warehouse_product_state
+       WHERE warehouse_id=$1 AND consensus_price_cents IS NOT NULL
+     ),
+     observation_stats AS (
+       SELECT count(*) FILTER (WHERE observed_at >= now()-interval '7 days')::float8 / 7.0 AS daily_verification_volume_7d,
+              count(DISTINCT submitter_user_id) FILTER (WHERE observed_at >= now()-interval '30 days')::int AS distinct_contributors_last_30d,
+              CASE WHEN count(*) FILTER (WHERE observed_at >= now()-interval '30 days')=0 THEN 0
+                ELSE count(*) FILTER (WHERE observed_at >= now()-interval '30 days' AND verification_status='flagged')::float8 /
+                     count(*) FILTER (WHERE observed_at >= now()-interval '30 days') END AS conflict_ratio,
+              CASE WHEN count(*) FILTER (WHERE observed_at >= now()-interval '30 days')=0 THEN 0
+                ELSE count(*) FILTER (WHERE observed_at >= now()-interval '30 days' AND evidence_id IS NOT NULL)::float8 /
+                     count(*) FILTER (WHERE observed_at >= now()-interval '30 days') END AS evidence_ratio
+       FROM price_observations WHERE warehouse_id=$1
+     )
+     SELECT * FROM state_stats CROSS JOIN observation_stats`,
+    [warehouseId],
+  );
+  sendJson(res, 200, { stats: result.rows[0] });
+}
+
+async function listPriceEvents(res, url) {
+  const warehouseId = url.searchParams.get('warehouseId');
+  if (!uuid(warehouseId)) throw Object.assign(new Error('warehouseId is required'), { status: 400 });
+  const limit = safeLimit(url.searchParams.get('limit'), 20, 100);
+  const type = url.searchParams.get('type');
+  const params = [warehouseId];
+  let filter = '';
+  if (type) {
+    params.push(type);
+    filter = ' AND e.event_type=$2';
+  }
+  const result = await query(
+    `SELECT e.*,p.canonical_name AS product_name,p.brand,w.name AS warehouse_name
+     FROM price_events e
+     JOIN products p ON p.id=e.product_id
+     JOIN warehouses w ON w.id=e.warehouse_id
+     WHERE e.warehouse_id=$1 ${filter}
+     ORDER BY e.effective_at DESC
+     LIMIT ${limit}`,
+    params,
+  );
+  sendJson(res, 200, { events: result.rows });
+}
+
 async function searchProducts(res, url) {
   const q = String(url.searchParams.get('q') || '').trim();
   const limit = safeLimit(url.searchParams.get('limit'), 20, 50);
@@ -895,6 +947,7 @@ async function routeApi(req, res, url, rid) {
   if (method === 'DELETE' && pathname === '/api/v1/me') return deleteMe(req, res);
 
   if (method === 'GET' && pathname === '/api/v1/warehouses') return listWarehouses(res, url);
+  if (method === 'GET' && pathname === '/api/v1/price-events') return listPriceEvents(res, url);
   if (method === 'GET' && pathname === '/api/v1/products/search') return searchProducts(res, url);
   if (method === 'POST' && pathname === '/api/v1/products/provisional') return createProvisionalProduct(req, res);
   if (method === 'POST' && pathname === '/api/v1/observations') return createObservation(req, res);
