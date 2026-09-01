@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonBackButton, IonButtons, IonInput, IonItem, IonLabel } from '@ionic/react';
+import {
+  IonBackButton,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonInput,
+  IonItem,
+  IonLabel,
+  IonPage,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/react';
 import { useWarehouse } from '@stores/warehouse';
 import { createPurchase } from '@services/api/purchases';
+import { getProduct, type ProductState } from '@services/api/products';
 import { cents, formatUSD, fromMajorUnits } from '@domain/money/cents';
-import { supabase } from '@services/supabase/client';
-
-interface ExistingPrice {
-  consensus_price_cents: number | null;
-}
 
 export function BuyItPage(): JSX.Element {
   const { productId } = useParams<{ productId: string }>();
@@ -19,27 +27,25 @@ export function BuyItPage(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [existing, setExisting] = useState<ExistingPrice | null>(null);
+  const [existing, setExisting] = useState<ProductState | null>(null);
 
-  // Pre-fill with the current consensus price when present.
   useEffect(() => {
     if (!productId || !selected) return;
     let cancelled = false;
-    supabase()
-      .from('warehouse_product_state')
-      .select('consensus_price_cents')
-      .eq('product_id', productId)
-      .eq('warehouse_id', selected.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    getProduct(productId, selected.id)
+      .then(({ state }) => {
         if (cancelled) return;
-        const row = data as ExistingPrice | null;
-        if (row?.consensus_price_cents != null) {
-          setUnitPrice(((row.consensus_price_cents as number) / 100).toFixed(2));
-          setExisting(row);
+        setExisting(state);
+        if (state?.consensus_price_cents != null) {
+          setUnitPrice((state.consensus_price_cents / 100).toFixed(2));
         }
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [productId, selected]);
 
   async function submit() {
@@ -47,12 +53,13 @@ export function BuyItPage(): JSX.Element {
       setError('Pick a warehouse on Home first.');
       return;
     }
-    const unitCents = fromMajorUnits(Number(unitPrice));
+    const price = Number(unitPrice);
     const qty = Number(quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError('Enter a valid quantity');
+    if (!Number.isFinite(price) || price < 0 || !Number.isFinite(qty) || qty <= 0) {
+      setError('Enter a valid price and quantity.');
       return;
     }
+    const unitCents = fromMajorUnits(price);
     setBusy(true);
     setError(null);
     try {
@@ -84,7 +91,6 @@ export function BuyItPage(): JSX.Element {
         <div className="cs-page">
           <p className="cs-muted">
             Recording at <span className="cs-strong">{selected?.name ?? 'no warehouse'}</span>.
-            You can adjust the price you actually paid below.
           </p>
           <IonItem>
             <IonLabel position="stacked">Price you paid (USD)</IonLabel>
@@ -98,7 +104,7 @@ export function BuyItPage(): JSX.Element {
           <IonItem>
             <IonLabel position="stacked">Quantity</IonLabel>
             <IonInput
-              inputMode="numeric"
+              inputMode="decimal"
               value={quantity}
               onIonChange={(e) => setQuantity(e.detail.value ?? '')}
             />
