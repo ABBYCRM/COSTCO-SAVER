@@ -11,6 +11,8 @@ import { ProductDetailPage } from '@features/products/ProductDetailPage';
 import { SearchPage } from '@features/products/SearchPage';
 import { BuyItPage } from '@features/products/BuyItPage';
 import { AuthGate } from '@features/auth/AuthGate';
+import { TripPage } from '@features/trip/TripPage';
+import { AdminPage } from '@features/admin/AdminPage';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -41,6 +43,8 @@ export function App(): JSX.Element {
               <Route exact path="/product/:productId" component={ProductDetailPage} />
               <Route exact path="/product/:productId/buy" component={BuyItPage} />
               <Route exact path="/search" component={SearchPage} />
+              <Route exact path="/trip" component={TripPage} />
+              <Route exact path="/admin" component={AdminPage} />
             </IonRouterOutlet>
             <AppShell />
           </IonTabs>
