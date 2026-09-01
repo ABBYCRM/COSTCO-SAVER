@@ -1,88 +1,122 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSegment, IonSegmentButton, IonLabel, IonButton } from '@ionic/react';
+import {
+  IonButton,
+  IonContent,
+  IonHeader,
+  IonLabel,
+  IonPage,
+  IonSegment,
+  IonSegmentButton,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/react';
+import { useHistory } from 'react-router';
 import { useWarehouse } from '@stores/warehouse';
-import { listWatches, type WatchRow } from '@services/api/watches';
-import { listPurchases, type PurchaseRow } from '@services/api/purchases';
-import { listAdjustments, setAdjustmentStatus, type AdjustmentRow } from '@services/api/adjustments';
-import { supabase } from '@services/supabase/client';
+import { listWatches, deleteWatch, type WatchRow } from '@services/api/watches';
+import { listPurchases, deletePurchase, type PurchaseRow } from '@services/api/purchases';
+import {
+  listAdjustments,
+  setAdjustmentStatus,
+  type AdjustmentRow,
+} from '@services/api/adjustments';
+import {
+  listSavedDeals,
+  deleteSavedDeal,
+  type SavedDealRow,
+} from '@services/api/savedDeals';
 import { formatUSD, cents } from '@domain/money/cents';
 
 type Section = 'watching' | 'purchases' | 'adjustments' | 'deals';
 
 export function SavedPage(): JSX.Element {
+  const history = useHistory();
   const { selected } = useWarehouse();
   const [section, setSection] = useState<Section>('watching');
   const [watches, setWatches] = useState<WatchRow[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([]);
-  const [purchaseProducts, setPurchaseProducts] = useState<Record<string, string>>({});
-  const [purchaseWarehouses, setPurchaseWarehouses] = useState<Record<string, string>>({});
+  const [savedDeals, setSavedDeals] = useState<SavedDealRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function loadAll() {
     setLoading(true);
-    Promise.all([listWatches(), listPurchases(), listAdjustments()])
-      .then(async ([w, p, a]) => {
-        if (cancelled) return;
-        setWatches(w);
-        setPurchases(p);
-        setAdjustments(a);
-        // Fetch related product and warehouse names for purchases.
-        const productIds = Array.from(new Set(p.map((x) => x.product_id)));
-        const warehouseIds = Array.from(new Set(p.map((x) => x.warehouse_id)));
-        if (productIds.length) {
-          const { data: prods } = await supabase()
-            .from('products')
-            .select('id, canonical_name')
-            .in('id', productIds);
-          if (!cancelled) {
-            const map: Record<string, string> = {};
-            for (const r of (prods ?? []) as { id: string; canonical_name: string }[]) {
-              map[r.id] = r.canonical_name;
-            }
-            setPurchaseProducts(map);
-          }
-        }
-        if (warehouseIds.length) {
-          const { data: whs } = await supabase()
-            .from('warehouses')
-            .select('id, name')
-            .in('id', warehouseIds);
-          if (!cancelled) {
-            const map: Record<string, string> = {};
-            for (const r of (whs ?? []) as { id: string; name: string }[]) {
-              map[r.id] = r.name;
-            }
-            setPurchaseWarehouses(map);
-          }
-        }
-        setLoading(false);
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setError(err.message);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setError(null);
+    try {
+      const [nextWatches, nextPurchases, nextAdjustments, nextDeals] = await Promise.all([
+        listWatches(),
+        listPurchases(),
+        listAdjustments(),
+        listSavedDeals(),
+      ]);
+      setWatches(nextWatches);
+      setPurchases(nextPurchases);
+      setAdjustments(nextAdjustments);
+      setSavedDeals(nextDeals);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load saved items');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAll();
   }, []);
 
   async function markAdjustment(id: string, status: AdjustmentRow['status']) {
+    setBusyId(id);
     setError(null);
     try {
       await setAdjustmentStatus(id, status);
-      const next = adjustments.map((a) => (a.id === id ? { ...a, status } : a));
-      setAdjustments(next);
+      setAdjustments((rows) => rows.map((row) => (row.id === id ? { ...row, status } : row)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update adjustment');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeWatch(id: string) {
+    setBusyId(id);
+    try {
+      await deleteWatch(id);
+      setWatches((rows) => rows.filter((row) => row.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove watch');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removePurchase(id: string) {
+    if (!window.confirm('Delete this purchase record?')) return;
+    setBusyId(id);
+    try {
+      await deletePurchase(id);
+      setPurchases((rows) => rows.filter((row) => row.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete purchase');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeSavedDeal(id: string) {
+    setBusyId(id);
+    try {
+      await deleteSavedDeal(id);
+      setSavedDeals((rows) => rows.filter((row) => row.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove saved deal');
+    } finally {
+      setBusyId(null);
     }
   }
 
   const adjustmentOpportunities = adjustments.filter(
-    (a) => a.status === 'opportunity' && (selected == null || a.warehouse_id === selected.id),
+    (row) => row.status === 'opportunity' && (!selected || row.warehouse_id === selected.id),
   );
 
   return (
@@ -98,107 +132,179 @@ export function SavedPage(): JSX.Element {
             <IonSegmentButton value="watching"><IonLabel>Watching</IonLabel></IonSegmentButton>
             <IonSegmentButton value="purchases"><IonLabel>Purchases</IonLabel></IonSegmentButton>
             <IonSegmentButton value="adjustments"><IonLabel>Adjustments</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="deals"><IonLabel>Saved deals</IonLabel></IonSegmentButton>
+            <IonSegmentButton value="deals"><IonLabel>Deals</IonLabel></IonSegmentButton>
           </IonSegment>
 
           {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-
-          {loading && <div className="cs-card cs-stack" aria-busy="true"><div className="cs-skeleton" style={{ width: '60%' }} /></div>}
+          {loading && (
+            <div className="cs-card cs-stack" aria-busy="true">
+              <div className="cs-skeleton" style={{ width: '60%' }} />
+            </div>
+          )}
 
           {!loading && section === 'watching' && (
-            <>
-              {watches.length === 0 ? (
-                <div className="cs-empty">
-                  <p>You are not watching any products.</p>
-                  <p className="cs-muted">Open a product and tap Watch to get notified when its verified price changes.</p>
-                  <IonButton onClick={() => location.assign('/home')}>Go to Home</IonButton>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {watches.map((w) => (
-                    <li key={w.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="cs-strong">Watch</div>
-                          {w.target_price_cents != null && (
-                            <div className="cs-muted">Target: {formatUSD(cents(w.target_price_cents))}</div>
-                          )}
-                        </div>
-                        <div>
-                          {w.notify_any_drop && <span className="cs-pill">any drop</span>}
-                          {w.notify_clearance && <span className="cs-pill cs-pill--clearance">.97</span>}
-                          {w.notify_manager_markdown && <span className="cs-pill cs-pill--aging">manager</span>}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+            watches.length === 0 ? (
+              <div className="cs-empty">
+                <p>You are not watching any products.</p>
+                <IonButton onClick={() => history.push('/search')}>Find a product</IonButton>
+              </div>
+            ) : (
+              <ul className="cs-stack" style={{ listStyle: 'none', padding: 0 }}>
+                {watches.map((watch) => (
+                  <li key={watch.id} className="cs-card">
+                    <div className="cs-row" style={{ justifyContent: 'space-between' }}>
+                      <button
+                        className="cs-link-button"
+                        onClick={() => history.push(`/product/${watch.product_id}`)}
+                      >
+                        <span className="cs-strong">{watch.canonical_name ?? 'Product'}</span>
+                        {watch.warehouse_name && <span className="cs-muted">{watch.warehouse_name}</span>}
+                      </button>
+                      <IonButton
+                        size="small"
+                        fill="outline"
+                        disabled={busyId === watch.id}
+                        onClick={() => removeWatch(watch.id)}
+                      >
+                        Remove
+                      </IonButton>
+                    </div>
+                    <div className="cs-row" style={{ flexWrap: 'wrap', marginTop: 'var(--cs-space-2)' }}>
+                      {watch.target_price_cents != null && (
+                        <span className="cs-pill">target {formatUSD(cents(watch.target_price_cents))}</span>
+                      )}
+                      {watch.notify_any_drop && <span className="cs-pill">any drop</span>}
+                      {watch.notify_clearance && <span className="cs-pill cs-pill--clearance">.97</span>}
+                      {watch.notify_manager_markdown && <span className="cs-pill cs-pill--aging">manager</span>}
+                      {watch.notify_asterisk && <span className="cs-pill">asterisk</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
 
           {!loading && section === 'purchases' && (
-            <>
-              {purchases.length === 0 ? (
-                <div className="cs-empty">
-                  <p>No purchases recorded yet.</p>
-                  <p className="cs-muted">You can record a purchase from any product detail page.</p>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {purchases.map((p) => (
-                    <li key={p.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="cs-strong">{purchaseProducts[p.product_id] ?? 'Product'}</div>
-                          <div className="cs-muted">
-                            {purchaseWarehouses[p.warehouse_id] ?? 'Warehouse'} · {new Date(p.purchase_date).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="cs-price cs-strong">
-                          {formatUSD(cents(p.total_cents))}
-                        </div>
+            purchases.length === 0 ? (
+              <div className="cs-empty">
+                <p>No purchases recorded yet.</p>
+                <p className="cs-muted">Record a purchase from a product page to track future drops.</p>
+              </div>
+            ) : (
+              <ul className="cs-stack" style={{ listStyle: 'none', padding: 0 }}>
+                {purchases.map((purchase) => (
+                  <li key={purchase.id} className="cs-card">
+                    <div className="cs-row" style={{ justifyContent: 'space-between' }}>
+                      <button
+                        className="cs-link-button"
+                        onClick={() => history.push(`/product/${purchase.product_id}`)}
+                      >
+                        <span className="cs-strong">{purchase.canonical_name ?? 'Product'}</span>
+                        <span className="cs-muted">
+                          {purchase.warehouse_name ?? 'Warehouse'} ·{' '}
+                          {new Date(purchase.purchase_date).toLocaleDateString()}
+                        </span>
+                      </button>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="cs-price cs-strong">{formatUSD(cents(purchase.total_cents))}</div>
+                        <IonButton
+                          size="small"
+                          fill="clear"
+                          color="danger"
+                          disabled={busyId === purchase.id}
+                          onClick={() => removePurchase(purchase.id)}
+                        >
+                          Delete
+                        </IonButton>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
 
           {!loading && section === 'adjustments' && (
-            <>
-              {adjustmentOpportunities.length === 0 ? (
-                <div className="cs-empty">
-                  <p>No adjustment opportunities right now.</p>
-                  <p className="cs-muted">If a price drops within 30 days of your purchase, we will surface it here.</p>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {adjustmentOpportunities.map((a) => (
-                    <li key={a.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="cs-strong">You may be able to recover {formatUSD(cents(a.potential_savings_cents))}</div>
-                          <div className="cs-muted">{a.days_remaining} days remaining · status: {a.status}</div>
-                        </div>
-                        <div>
-                          <IonButton size="small" onClick={() => markAdjustment(a.id, 'claimed')}>Mark Claimed</IonButton>
-                          <IonButton size="small" fill="outline" onClick={() => markAdjustment(a.id, 'dismissed')}>Dismiss</IonButton>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+            adjustmentOpportunities.length === 0 ? (
+              <div className="cs-empty">
+                <p>No potential price-adjustment opportunities right now.</p>
+              </div>
+            ) : (
+              <ul className="cs-stack" style={{ listStyle: 'none', padding: 0 }}>
+                {adjustmentOpportunities.map((adjustment) => (
+                  <li key={adjustment.id} className="cs-card">
+                    <div className="cs-strong">
+                      {adjustment.canonical_name ?? 'Product'} · potential{' '}
+                      {formatUSD(cents(adjustment.potential_savings_cents))}
+                    </div>
+                    <div className="cs-muted">
+                      Paid {formatUSD(cents(adjustment.purchase_price_cents))} · now{' '}
+                      {formatUSD(cents(adjustment.new_price_cents))} · {adjustment.days_remaining} days remaining
+                    </div>
+                    <p className="cs-muted">
+                      Verify eligibility with Costco. Final approval is determined by Costco.
+                    </p>
+                    <div className="cs-row">
+                      <IonButton
+                        size="small"
+                        disabled={busyId === adjustment.id}
+                        onClick={() => markAdjustment(adjustment.id, 'claimed')}
+                      >
+                        Mark claimed
+                      </IonButton>
+                      <IonButton
+                        size="small"
+                        fill="outline"
+                        disabled={busyId === adjustment.id}
+                        onClick={() => markAdjustment(adjustment.id, 'dismissed')}
+                      >
+                        Dismiss
+                      </IonButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
 
           {!loading && section === 'deals' && (
-            <div className="cs-empty">
-              <p>You haven&apos;t saved any deals yet.</p>
-              <p className="cs-muted">Open a deal on the Deals tab to save it for later.</p>
-            </div>
+            savedDeals.length === 0 ? (
+              <div className="cs-empty">
+                <p>No saved deals yet.</p>
+                <IonButton onClick={() => history.push('/deals')}>Browse deals</IonButton>
+              </div>
+            ) : (
+              <ul className="cs-stack" style={{ listStyle: 'none', padding: 0 }}>
+                {savedDeals.map((deal) => (
+                  <li key={deal.id} className="cs-card">
+                    <div className="cs-row" style={{ justifyContent: 'space-between' }}>
+                      <button
+                        className="cs-link-button"
+                        onClick={() => history.push(`/product/${deal.product_id}`)}
+                      >
+                        <span className="cs-strong">{deal.canonical_name}</span>
+                        <span className="cs-muted">{deal.warehouse_name}</span>
+                      </button>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="cs-price cs-strong">
+                          {deal.consensus_price_cents != null
+                            ? formatUSD(cents(deal.consensus_price_cents))
+                            : 'No current price'}
+                        </div>
+                        <IonButton
+                          size="small"
+                          fill="clear"
+                          disabled={busyId === deal.id}
+                          onClick={() => removeSavedDeal(deal.id)}
+                        >
+                          Remove
+                        </IonButton>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
         </div>
       </IonContent>
