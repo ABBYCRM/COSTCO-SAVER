@@ -1,5 +1,11 @@
+const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/$/, '');
 const ACCESS_KEY = 'costco-saver.access-token';
 const REFRESH_KEY = 'costco-saver.refresh-token';
+
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+}
 
 export interface ApiErrorPayload {
   error?: {
@@ -49,7 +55,7 @@ export function clearSession(): void {
 async function refreshSession(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
-  const response = await fetch('/api/v1/auth/refresh', {
+  const response = await fetch(apiUrl('/api/v1/auth/refresh'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
@@ -78,7 +84,7 @@ export async function apiFetch<T>(
   const accessToken = getAccessToken();
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
 
-  const response = await fetch(path, { ...init, headers });
+  const response = await fetch(apiUrl(path), { ...init, headers });
   if (response.status === 401 && retry && getRefreshToken()) {
     const refreshed = await refreshSession();
     if (refreshed) return apiFetch<T>(path, init, false);
