@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
+import { BootErrorBoundary } from './app/BootErrorBoundary';
 import './styles/tokens.css';
 import './styles/global.css';
 
@@ -11,6 +12,8 @@ if (!rootEl) {
 
 createRoot(rootEl).render(
   <React.StrictMode>
-    <App />
+    <BootErrorBoundary>
+      <App />
+    </BootErrorBoundary>
   </React.StrictMode>,
 );

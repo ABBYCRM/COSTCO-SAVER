@@ -3,6 +3,19 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '';
 const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? '';
 
+/**
+ * `true` when the build was compiled with Supabase env vars present.
+ * `false` when the bundle was shipped without them (e.g. on the public
+ * demo deploy, before the operator has linked a real Supabase project).
+ *
+ * Components should check this and render an explanatory screen instead
+ * of throwing, so the user sees something useful instead of an empty
+ * dark page.
+ */
+export function isSupabaseConfigured(): boolean {
+  return Boolean(url) && Boolean(anonKey);
+}
+
 let _client: SupabaseClient | null = null;
 
 /**
@@ -15,14 +28,17 @@ let _client: SupabaseClient | null = null;
  * - auth.persistSession is wired to localStorage for the web runtime; on
  *   native (Capacitor), the runtime's secure storage plugin is used by the
  *   host app to bridge to NSUserDefaults / SharedPreferences.
+ *
+ * Throws if env vars are missing. Callers that want a graceful UX should
+ * check {@link isSupabaseConfigured} first and show a fallback screen.
  */
 export function supabase(): SupabaseClient {
-  if (_client) return _client;
   if (!url || !anonKey) {
     throw new Error(
       'Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
     );
   }
+  if (_client) return _client;
   _client = createClient(url, anonKey, {
     auth: {
       persistSession: true,
