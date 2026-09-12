@@ -23,9 +23,14 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
+        // Keep react-router + @ionic/react-router in the SAME chunk.
+        // They have a circular dep (Ionic's react-router re-exports from
+        // react-router-dom; react-router-dom uses some Ionic internals).
+        // Splitting them across vendor/ionic chunks produced a TDZ error
+        // "Cannot access 'w' before initialization" at boot.
+        // Verified 2026-09-12 — see agent memory COSTCO-SAVER entry.
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router', 'react-router-dom'],
-          ionic: ['@ionic/react', '@ionic/react-router'],
+          react: ['react', 'react-dom', 'react-router', 'react-router-dom', '@ionic/react', '@ionic/react-router'],
           supabase: ['@supabase/supabase-js'],
         },
       },
