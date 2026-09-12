@@ -8,8 +8,9 @@ tasks that keep the system honest.
 
 | Surface | URL | App id / repo |
 | --- | --- | --- |
-| **Web app (primary, HTTPS-trusted)** | **https://abbycrm.github.io/COSTCO-SAVER/** | GH Pages — branch `dist` |
-| Web app (DO App Platform, current cert problem — see Known Deploy Issues) | https://costco-saver-kvacx.ondigitalocean.app | DO App `3f0056fa-47f1-4d61-9fec-cc7fe56b1255` — branch `2026-08-31/feature/phase-0-bootstrap` |
+| **Web app (primary, HTTPS-trusted, no DO cert needed)** | **https://abbycrm.github.io/COSTCO-SAVER/** | GH Pages — branch `dist` |
+| Web app (DO App Platform, currently broken cert — see Known Deploy Issues) | https://costco-saver-kvacx.ondigitalocean.app | DO App `3f0056fa-47f1-4d61-9fec-cc7fe56b1255` — branch `2026-08-31/feature/phase-0-bootstrap` |
+| Web app (Cloudflare quick tunnel, ephemeral, demo only) | `*.trycloudflare.com` (per session) | `scripts/setup-quick-tunnel.sh` |
 | iOS TestFlight | (TBD by Codemagic) | `costco_saver_apple` secret group |
 | Android Play Internal | (TBD by Codemagic) | `costco_saver_google` secret group |
 | Supabase | (TBD by operator) | migrations under `supabase/migrations/` |
@@ -214,15 +215,24 @@ self-signed cert from DO's underlying Kubernetes ingress, NOT the
 usual Cloudflare edge cert. Browsers refuse the connection; users
 see "your connection is not private" / a Cloudflare 502 page.
 
-Workaround: serve the static `dist/` from GitHub Pages instead.
-`scripts/deploy-ghpages.sh` builds the bundle and pushes it to the
-`dist` branch, which GH Pages auto-publishes with a real Let's
-Encrypt cert at https://abbycrm.github.io/COSTCO-SAVER/. This is
-the current primary live URL.
+**Workaround A (primary):** serve the static `dist/` from GitHub
+Pages instead. `scripts/deploy-ghpages.sh` builds the bundle and
+pushes it to the `dist` branch, which GH Pages auto-publishes with
+a real Let's Encrypt cert at https://abbycrm.github.io/COSTCO-SAVER/.
+
+**Workaround B (live demo, ephemeral):** Cloudflare quick tunnel
+fronting the DO app's HTTP port. The DO app is also reachable on
+plain HTTP at `costco-saver-kvacx.ondigitalocean.app:8080`, so a
+`cloudflared --url http://costco-saver-kvacx.ondigitalocean.app:8080 --http-host-header costco-saver-kvacx.ondigitalocean.app`
+quick tunnel produces a `*.trycloudflare.com` URL that proxies to
+the DO app over HTTP, terminates TLS at Cloudflare with a trusted
+cert. Run via `scripts/setup-quick-tunnel.sh`. Lasts only while the
+process runs — for production use a named tunnel.
 
 Long-term fix: open a DO support ticket about the cert chain for
 the App Platform domain, OR add a custom domain (DO auto-issues a
-Let's Encrypt cert for those).
+Let's Encrypt cert for those), OR run a named Cloudflare Tunnel
+pointed at a CF-proxied domain the operator owns.
 
 ### Vite manualChunks can split a circular dep across chunks
 
