@@ -8,7 +8,8 @@ tasks that keep the system honest.
 
 | Surface | URL | App id / repo |
 | --- | --- | --- |
-| **Web app (live)** | **https://costco-saver-kvacx.ondigitalocean.app** | DO App `3f0056fa-47f1-4d61-9fec-cc7fe56b1255` — branch `2026-08-31/feature/phase-0-bootstrap` |
+| **Web app (primary, HTTPS-trusted)** | **https://abbycrm.github.io/COSTCO-SAVER/** | GH Pages — branch `dist` |
+| Web app (DO App Platform, current cert problem — see Known Deploy Issues) | https://costco-saver-kvacx.ondigitalocean.app | DO App `3f0056fa-47f1-4d61-9fec-cc7fe56b1255` — branch `2026-08-31/feature/phase-0-bootstrap` |
 | iOS TestFlight | (TBD by Codemagic) | `costco_saver_apple` secret group |
 | Android Play Internal | (TBD by Codemagic) | `costco_saver_google` secret group |
 | Supabase | (TBD by operator) | migrations under `supabase/migrations/` |
@@ -203,3 +204,48 @@ The Heroku Node buildpack does a recursive search for the first
 has one. Place the admin scaffold in `admin-scaffold/` (or another
 non-standard directory name) and remove any sub-package.json before
 the build.
+
+### DO App Platform is currently serving a self-signed cert
+
+As of 2026-09-12, every `.ondigitalocean.app` hostname on this DO
+team is being served a TLS cert issued by
+`O=hangzhou, OU=alibaba cloud, CN=ack-agent-identity-proxy` — a
+self-signed cert from DO's underlying Kubernetes ingress, NOT the
+usual Cloudflare edge cert. Browsers refuse the connection; users
+see "your connection is not private" / a Cloudflare 502 page.
+
+Workaround: serve the static `dist/` from GitHub Pages instead.
+`scripts/deploy-ghpages.sh` builds the bundle and pushes it to the
+`dist` branch, which GH Pages auto-publishes with a real Let's
+Encrypt cert at https://abbycrm.github.io/COSTCO-SAVER/. This is
+the current primary live URL.
+
+Long-term fix: open a DO support ticket about the cert chain for
+the App Platform domain, OR add a custom domain (DO auto-issues a
+Let's Encrypt cert for those).
+
+### Vite manualChunks can split a circular dep across chunks
+
+Symptom at runtime (even though `vite build` succeeds):
+`ReferenceError: Cannot access 'w' before initialization` thrown
+at vendor chunk top-level, before React's error boundary can mount,
+so the user sees an empty dark page.
+
+Cause: `react-router-dom` and `@ionic/react-router` have a circular
+import (Ionic's react-router re-exports from react-router-dom;
+react-router-dom uses some Ionic internals at module top level via
+`var mr = w.createContext || dr`). When `vite.config.ts` puts them
+in different chunks (`vendor` vs `ionic`), the browser evaluates
+vendor first and hits the TDZ.
+
+Fix: collapse them into a single chunk. In `vite.config.ts`:
+
+```ts
+manualChunks: {
+  react: ['react', 'react-dom', 'react-router', 'react-router-dom',
+          '@ionic/react', '@ionic/react-router'],
+  supabase: ['@supabase/supabase-js'],
+}
+```
+
+Verified 2026-09-12 — see commit `d8ffc88`.
