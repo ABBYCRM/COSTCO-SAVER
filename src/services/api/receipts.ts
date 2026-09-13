@@ -1,4 +1,4 @@
-import { supabase } from '@services/supabase/client';
+import { requireUserId, supabase } from '@services/supabase/client';
 
 export interface ReceiptRow {
   id: string;
@@ -38,12 +38,11 @@ export interface CreateReceiptResult {
  * Confirmed receipt lines also produce private purchase rows (spec §28).
  */
 export async function createReceipt(input: CreateReceiptInput): Promise<CreateReceiptResult> {
+  const userId = await requireUserId();
+
   // 1. Upload evidence if provided.
   let evidenceId: string | null = null;
   if (input.evidenceFile) {
-    const { data: userRes } = await supabase().auth.getUser();
-    const userId = userRes.user?.id;
-    if (!userId) throw new Error('Not authenticated');
     const path = `${userId}/receipts/${Date.now()}/${input.evidenceFile.name || 'receipt.jpg'}`;
     const { error: upErr } = await supabase().storage
       .from('private-receipts')
@@ -62,6 +61,7 @@ export async function createReceipt(input: CreateReceiptInput): Promise<CreateRe
   const { data: receipt, error: rErr } = await supabase()
     .from('receipts')
     .insert({
+      user_id: userId,
       warehouse_id: input.warehouseId,
       purchase_date: input.purchaseDate,
       total_cents: input.totalCents,
@@ -78,10 +78,24 @@ export async function createReceipt(input: CreateReceiptInput): Promise<CreateRe
   // 3. Insert lines and corresponding purchase rows.
   const purchaseIds: string[] = [];
   for (const line of input.lines) {
-    if (line.productId == null) continue;
+    const { error: lineErr } = await supabase()
+      .from('receipt_lines')
+      .insert({
+        receipt_id: receiptId,
+        product_id: line.productId,
+        raw_description: line.rawDescription,
+        costco_item_number: line.costcoItemNumber,
+        quantity: line.quantity,
+        unit_price_cents: line.unitPriceCents,
+        total_cents: line.totalCents,
+        line_order: line.lineOrder,
+      });
+    if (lineErr) throw lineErr;
+    if (line.productId == null || input.warehouseId == null) continue;
     const { data: purchase, error: pErr } = await supabase()
       .from('purchases')
       .insert({
+        user_id: userId,
         product_id: line.productId,
         warehouse_id: input.warehouseId,
         unit_price_cents: line.unitPriceCents,

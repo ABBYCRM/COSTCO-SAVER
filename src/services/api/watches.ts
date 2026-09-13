@@ -1,4 +1,4 @@
-import { supabase } from '@services/supabase/client';
+import { requireUserId, supabase } from '@services/supabase/client';
 
 export interface CreateWatchInput {
   productId: string;
@@ -27,11 +27,14 @@ export interface WatchRow {
  * their user_id and cannot be created on someone else's behalf.
  */
 export async function createWatch(input: CreateWatchInput): Promise<WatchRow> {
+  const userId = await requireUserId();
   const { data, error } = await supabase()
     .from('watches')
     .insert({
+      user_id: userId,
       product_id: input.productId,
       warehouse_id: input.warehouseId ?? null,
+      scope: input.warehouseId ? 'specific_warehouse' : 'any_warehouse',
       target_price_cents: input.targetPriceCents ?? null,
       notify_any_drop: input.notifyAnyDrop ?? false,
       notify_clearance: input.notifyClearance ?? false,

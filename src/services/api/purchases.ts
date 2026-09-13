@@ -1,4 +1,4 @@
-import { supabase } from '@services/supabase/client';
+import { requireUserId, supabase } from '@services/supabase/client';
 
 export interface PurchaseRow {
   id: string;
@@ -34,10 +34,12 @@ export async function listPurchases(): Promise<PurchaseRow[]> {
 }
 
 export async function createPurchase(input: CreatePurchaseInput): Promise<PurchaseRow> {
+  const userId = await requireUserId();
   const total = Math.max(0, Math.round(input.unitPriceCents * input.quantity));
   const { data, error } = await supabase()
     .from('purchases')
     .insert({
+      user_id: userId,
       product_id: input.productId,
       warehouse_id: input.warehouseId,
       unit_price_cents: input.unitPriceCents,
