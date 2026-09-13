@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonItem, IonLabel, IonCheckbox, IonNote, IonButtons, IonMenuButton } from '@ionic/react';
-import { useHistory } from 'react-router';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton } from '@ionic/react';
 import { requireUserId, supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
 import { normalizeBarcode, type BarcodeKind } from '@domain/barcodes/normalizeBarcode';
@@ -14,8 +13,20 @@ interface ScannerHandle {
   scan: () => Promise<string | null>;
 }
 
+/**
+ * Scan page. Spec §47, §52, §69.
+ *
+ * Two modes:
+ *   - barcode: native camera scanner (Capacitor) or manual entry, looks up
+ *     the product by identifier, writes scan_history.
+ *   - shelf_tag: enter the displayed price + item number, writes a real
+ *     price_observation via submitShelfObservation.
+ *
+ * UI uses the COSTCO-SAVER design system: native form controls styled by
+ * global.css, segment control for mode, error / success states use the
+ * .cs-state / .cs-error conventions.
+ */
 export function ScanPage(): JSX.Element {
-  const history = useHistory();
   const { selected } = useWarehouse();
   const [mode, setMode] = useState<ScanMode>('barcode');
   const [manualBarcode, setManualBarcode] = useState('');
@@ -55,6 +66,10 @@ export function ScanPage(): JSX.Element {
 
   async function onBarcodeScanned(content: string): Promise<void> {
     const normalized = normalizeBarcode(content);
+    if (!normalized.value) {
+      setError('Empty barcode.');
+      return;
+    }
     if (normalized.kind === 'UNKNOWN' || !normalized.checkDigitValid) {
       setManualBarcode(content);
       setError(
@@ -64,7 +79,6 @@ export function ScanPage(): JSX.Element {
       );
       return;
     }
-    // Look up the product via barcode.
     const { data, error: err } = await supabase()
       .from('product_identifiers')
       .select('product_id, products(id, canonical_name, brand)')
@@ -90,7 +104,7 @@ export function ScanPage(): JSX.Element {
       } catch {
         // History is best-effort; lookup still succeeds.
       }
-      history.push(`/product/${productId}`);
+      window.location.assign(`/product/${productId}`);
     } else {
       setManualBarcode(content);
       setError('Unknown product. Fill in the form to create it.');
@@ -150,7 +164,7 @@ export function ScanPage(): JSX.Element {
       });
       const classification = classifyPriceCode({ priceCents, hasAsterisk });
       setLastResult(`Submitted: ${formatUSD(priceCents)} (${classification.classification})`);
-      history.push(`/product/${productId}`);
+      window.location.assign(`/product/${productId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit observation');
     } finally {
@@ -168,87 +182,120 @@ export function ScanPage(): JSX.Element {
       </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
-          <div className="cs-row" style={{ flexWrap: 'wrap' }}>
-            <IonButton fill={mode === 'barcode' ? 'solid' : 'outline'} onClick={() => setMode('barcode')}>
-              Scan product
-            </IonButton>
-            <IonButton fill={mode === 'shelf_tag' ? 'solid' : 'outline'} onClick={() => setMode('shelf_tag')}>
-              Scan price tag
-            </IonButton>
+          <header className="cs-header">
+            <span className="cs-header__eyebrow">Submit</span>
+            <h2 className="cs-header__title">What did you see?</h2>
+            <p className="cs-header__sub">A barcode, a price tag, or an item number.</p>
+          </header>
+
+          <div className="cs-segment" role="tablist" aria-label="Scan mode">
+            <button
+              type="button"
+              className="cs-segment__item"
+              role="tab"
+              aria-pressed={mode === 'barcode'}
+              onClick={() => setMode('barcode')}
+            >
+              Barcode
+            </button>
+            <button
+              type="button"
+              className="cs-segment__item"
+              role="tab"
+              aria-pressed={mode === 'shelf_tag'}
+              onClick={() => setMode('shelf_tag')}
+            >
+              Shelf tag
+            </button>
           </div>
 
           {mode === 'barcode' && (
-            <section className="cs-card" style={{ marginTop: 'var(--cs-space-4)' }}>
+            <section className="cs-card cs-stack">
               <h3 className="cs-strong" style={{ margin: 0 }}>Product barcode</h3>
-              <p className="cs-muted">On native, the camera scanner opens. On web, enter manually.</p>
-              <IonButton
-                expand="block"
+              <p className="cs-muted" style={{ margin: 0 }}>Native cameras open automatically. Web falls back to manual entry.</p>
+              <button
+                type="button"
+                className="cs-button"
                 onClick={() => scannerRef.current?.scan().then((c) => c ? onBarcodeScanned(c) : null).catch((err: Error) => setError(err.message ?? 'Scanner failed'))}
               >
                 Open scanner
-              </IonButton>
-              <IonItem>
-                <IonLabel position="stacked">Manual entry</IonLabel>
-                <IonInput
+              </button>
+              <label className="cs-field">
+                <span className="cs-field__label">Manual entry</span>
+                <input
+                  className="cs-field__input"
                   value={manualBarcode}
                   inputMode="numeric"
-                  onIonChange={(e) => setManualBarcode(e.detail.value ?? '')}
+                  onChange={(e) => setManualBarcode(e.target.value)}
                   placeholder="UPC, EAN, or Costco item number"
                 />
-              </IonItem>
-              <IonButton
-                expand="block"
+              </label>
+              <button
+                type="button"
+                className="cs-button cs-button--ghost"
                 onClick={() => onBarcodeScanned(manualBarcode).catch((err: Error) => setError(err.message ?? 'Lookup failed'))}
                 disabled={!manualBarcode}
+                aria-disabled={!manualBarcode}
               >
                 Look up
-              </IonButton>
+              </button>
             </section>
           )}
 
           {mode === 'shelf_tag' && (
-            <section className="cs-card" style={{ marginTop: 'var(--cs-space-4)' }}>
+            <section className="cs-card cs-stack">
               <h3 className="cs-strong" style={{ margin: 0 }}>Shelf tag</h3>
-              <p className="cs-muted">Enter the displayed price and the Costco item number (if visible).</p>
-              <IonItem>
-                <IonLabel position="stacked">Price (USD)</IonLabel>
-                <IonInput
+              <p className="cs-muted" style={{ margin: 0 }}>Enter the displayed price and the Costco item number if visible.</p>
+              <label className="cs-field">
+                <span className="cs-field__label">Price (USD)</span>
+                <input
+                  className="cs-field__input"
                   inputMode="decimal"
                   value={manualPrice}
-                  onIonChange={(e) => setManualPrice(e.detail.value ?? '')}
+                  onChange={(e) => setManualPrice(e.target.value)}
                   placeholder="e.g. 19.97"
                 />
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Costco item number (optional)</IonLabel>
-                <IonInput
+              </label>
+              <label className="cs-field">
+                <span className="cs-field__label">Costco item number (optional)</span>
+                <input
+                  className="cs-field__input"
                   inputMode="numeric"
                   value={manualItemNumber}
-                  onIonChange={(e) => setManualItemNumber(e.detail.value ?? '')}
+                  onChange={(e) => setManualItemNumber(e.target.value)}
                   placeholder="e.g. 1234567"
                 />
-              </IonItem>
-              <IonItem>
-                <IonLabel>Asterisk on tag (no restock)</IonLabel>
-                <IonCheckbox
+              </label>
+              <label className="cs-field cs-field--row">
+                <span className="cs-field__label">Asterisk on tag (no restock)</span>
+                <input
+                  type="checkbox"
+                  className="cs-field__checkbox"
                   checked={hasAsterisk}
-                  onIonChange={(e) => setHasAsterisk(e.detail.checked)}
-                  slot="end"
+                  onChange={(e) => setHasAsterisk(e.target.checked)}
                 />
-              </IonItem>
-              <IonButton
-                expand="block"
+              </label>
+              <button
+                type="button"
+                className="cs-button"
                 onClick={submitManualShelfObservation}
                 disabled={busy || !manualPrice || !selected}
+                aria-disabled={busy || !manualPrice || !selected}
               >
                 {busy ? 'Submitting…' : 'Submit observation'}
-              </IonButton>
-              {!selected && <IonNote color="warning">Pick a warehouse on Home first.</IonNote>}
+              </button>
+              {!selected && (
+                <p className="cs-muted">Pick a warehouse on Home first.</p>
+              )}
             </section>
           )}
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-          {lastResult && <p className="cs-strong">{lastResult}</p>}
+          {error && (
+            <p role="alert" className="cs-error">{error}</p>
+          )}
+          {lastResult && (
+            <p role="status" className="cs-success">{lastResult}</p>
+          )}
           {(() => {
             const code = classifyPriceCode({ priceCents: cents(Math.round(Number(manualPrice || 0) * 100)), hasAsterisk });
             if (Number.isFinite(Number(manualPrice)) && Number(manualPrice) > 0) {

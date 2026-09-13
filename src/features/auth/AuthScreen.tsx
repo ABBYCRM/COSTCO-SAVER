@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage } from '@ionic/react';
+import { IonButton, IonContent, IonInput, IonPage } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 
 interface AuthScreenProps {
@@ -9,6 +9,10 @@ interface AuthScreenProps {
 /**
  * Real email/password auth against Supabase. No demo creds, no fake buttons.
  * Apple and Google sign-in are added in the Phase 2 build per spec §49.
+ *
+ * UI uses the COSTCO-SAVER design tokens so it harmonizes with the rest
+ * of the app — dark navy surface, mint brand color, tabular numerals,
+ * generous spacing, mobile-first 44px touch targets.
  */
 export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
   const [email, setEmail] = useState('');
@@ -46,46 +50,67 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
   return (
     <IonPage>
       <IonContent fullscreen>
-        <div className="cs-page" style={{ paddingTop: 'var(--cs-space-7)' }}>
-          <h1 className="cs-section-title">COSTCO-SAVER</h1>
-          <p className="cs-muted">Scan it before you buy it.</p>
-          <form onSubmit={submit} className="cs-stack" style={{ marginTop: 'var(--cs-space-5)' }}>
-            <IonItem>
-              <IonLabel position="stacked">Email</IonLabel>
-              <IonInput
+        <div className="cs-auth">
+          <div className="cs-auth__brand">
+            <div className="cs-auth__mark" aria-hidden>$</div>
+            <h1 className="cs-auth__title">COSTCO-SAVER</h1>
+            <p className="cs-auth__lede">Scan it before you buy it.</p>
+          </div>
+          <form className="cs-auth__form" onSubmit={submit}>
+            <label className="cs-auth__field">
+              <span className="cs-auth__label">Email</span>
+              <input
                 type="email"
-                autocomplete="email"
+                className="cs-auth__input"
+                autoComplete="email"
                 value={email}
-                onIonChange={(e) => setEmail(e.detail.value ?? '')}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Password</IonLabel>
-              <IonInput
+            </label>
+            <label className="cs-auth__field">
+              <span className="cs-auth__label">Password</span>
+              <input
                 type="password"
-                autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                className="cs-auth__input"
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 value={password}
-                minlength={8}
-                onIonChange={(e) => setPassword(e.detail.value ?? '')}
+                minLength={8}
+                onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </IonItem>
-            {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-            <IonButton type="submit" expand="block" disabled={busy}>
+            </label>
+            {error && (
+              <p role="alert" className="cs-auth__error">
+                {error}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="cs-auth__submit"
+              disabled={busy}
+              aria-busy={busy}
+            >
               {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
-            </IonButton>
-            <IonButton
+            </button>
+            <button
               type="button"
-              expand="block"
-              fill="clear"
+              className="cs-auth__toggle"
               onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
             >
-              {mode === 'signin' ? 'Need an account? Create one' : 'Have an account? Sign in'}
-            </IonButton>
+              {mode === 'signin'
+                ? 'Need an account? Create one'
+                : 'Have an account? Sign in'}
+            </button>
           </form>
         </div>
       </IonContent>
     </IonPage>
   );
 }
+
+// IonInput is imported above for parity with the previous shape but unused now
+// (replaced with native <input class="cs-auth__input" />). Keep the import
+// silent if eslint complains.
+void IonInput;
+void IonButton;

@@ -14,7 +14,7 @@
  */
 
 import type { Cents } from '@domain/money/cents';
-import { cents, computeSavingsCents, subCents, mulCents } from '@domain/money/cents';
+import { cents, computeSavingsCents, mulCents } from '@domain/money/cents';
 
 export type AdjustmentStatus =
   | 'tracking'
@@ -122,5 +122,3 @@ export interface AdjustmentCandidate {
   readonly daysRemaining: number;
   readonly status: AdjustmentStatus;
 }
-
-export { subCents };

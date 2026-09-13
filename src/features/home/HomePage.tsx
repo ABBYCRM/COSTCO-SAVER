@@ -17,6 +17,10 @@ interface DropResponse {
   effective_at: string;
   products: MaybeArray<{ canonical_name: string; brand: string | null }>;
   warehouses: MaybeArray<{ name: string }>;
+  warehouse_product_state: MaybeArray<{
+    markdown_class: string | null;
+    freshness_class: string;
+  }>;
 }
 
 interface DropRow {
@@ -58,7 +62,7 @@ export function HomePage(): JSX.Element {
     setLoadingDrops(true);
     supabase()
       .from('price_events')
-      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name)')
+      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name), warehouse_product_state!inner(markdown_class, freshness_class)')
       .eq('warehouse_id', selected.id)
       .eq('event_type', 'price_drop')
       .order('effective_at', { ascending: false })
@@ -73,6 +77,7 @@ export function HomePage(): JSX.Element {
         const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
           const p = first(d.products);
           const w = first(d.warehouses);
+          const state = first(d.warehouse_product_state);
           return {
             product_id: d.product_id,
             product_name: p?.canonical_name ?? 'Unknown product',
@@ -82,8 +87,8 @@ export function HomePage(): JSX.Element {
             old_price_cents: d.old_price_cents ?? 0,
             new_price_cents: d.new_price_cents,
             effective_at: d.effective_at,
-            markdown_class: null,
-            freshness_class: '',
+            markdown_class: state?.markdown_class ?? null,
+            freshness_class: state?.freshness_class ?? 'HISTORICAL',
           };
         });
         setDrops(rows);
@@ -98,7 +103,7 @@ export function HomePage(): JSX.Element {
     if (!selected) return;
     const { data, error: err } = await supabase()
       .from('price_events')
-      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name)')
+      .select('product_id, warehouse_id, old_price_cents, new_price_cents, effective_at, event_type, products(canonical_name, brand), warehouses(name), warehouse_product_state(markdown_class, freshness_class)')
       .eq('warehouse_id', selected.id)
       .eq('event_type', 'price_drop')
       .order('effective_at', { ascending: false })
@@ -107,6 +112,7 @@ export function HomePage(): JSX.Element {
       const rows: DropRow[] = (data ?? []).map((d: DropResponse) => {
         const p = first(d.products);
         const w = first(d.warehouses);
+        const state = first(d.warehouse_product_state);
         return {
           product_id: d.product_id,
           product_name: p?.canonical_name ?? 'Unknown product',
@@ -116,8 +122,8 @@ export function HomePage(): JSX.Element {
           old_price_cents: d.old_price_cents ?? 0,
           new_price_cents: d.new_price_cents,
           effective_at: d.effective_at,
-          markdown_class: null,
-          freshness_class: '',
+          markdown_class: state?.markdown_class ?? null,
+          freshness_class: state?.freshness_class ?? 'HISTORICAL',
         };
       });
       setDrops(rows);
