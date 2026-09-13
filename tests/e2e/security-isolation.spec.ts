@@ -28,6 +28,7 @@ test('User B cannot read User A purchase via direct URL', async ({ browser, requ
     await page.goto('/');
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Need an account? Create one' }).click();
     await page.getByRole('button', { name: 'Create account' }).click();
     await page.waitForResponse((r) => r.url().includes('/auth/v1/signup') && r.ok());
   }
