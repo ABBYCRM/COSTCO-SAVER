@@ -92,32 +92,31 @@ export function isValidGtin14(value: string): boolean {
  * Returns null if the input does not match the format.
  */
 export function expandUpcEtoUpcA(upce: string): string | null {
-  if (!/^\d{6}$/.test(upce)) return null;
-  // UPC-E bodies for items start with 0; the number system 0 is implied.
-  const d = upce[2]!;
-  const last = upce[5]!;
-  const abc = upce.slice(1, 4); // bcd
-  const de = upce.slice(4, 6);  // e0..e9 (we treat upce[2] specially)
-  let upca: string;
-  if (last === '0' || last === '1' || last === '2') {
-    upca = `0${abc}${last}000${de[0]}`;
-  } else if (last === '3') {
-    upca = `0${abc}00000${de[0]}`;
-  } else if (last === '4') {
-    upca = `0${abc}00000${de[0]}`;
-  } else if (last === '5' || last === '6' || last === '7' || last === '8' || last === '9') {
-    if (last === '7') upca = `0${abc}8000${de[0]}`;
-    else if (last === '8') upca = `0${abc}9000${de[0]}`;
-    else upca = `0${abc}0000${de[0]}`;
-  } else {
+  // Accept 6-digit core or 8-digit (number system + 6 + check).
+  let ns = '0';
+  let core = upce;
+  if (/^\d{8}$/.test(upce)) {
+    ns = upce[0]!;
+    core = upce.slice(1, 7);
+  } else if (!/^\d{6}$/.test(upce)) {
     return null;
   }
-  // The expanded form is 11 digits; we still need to add a check digit.
-  const check = computeCheckDigit(upca);
-  // d was the middle digit; it is dropped from the expanded form in the
-  // standard mapping. Recompute against the actual expanded body.
-  void d;
-  return upca + check.toString();
+  // GS1 / ZXing mapping of the 6-digit UPC-E core to an 11-digit UPC-A body.
+  const d = core;
+  const last = d[5]!;
+  let body: string;
+  if (last === '0' || last === '1' || last === '2') {
+    body = `${ns}${d.slice(0, 2)}${last}0000${d.slice(2, 5)}`;
+  } else if (last === '3') {
+    body = `${ns}${d.slice(0, 3)}00000${d.slice(3, 5)}`;
+  } else if (last === '4') {
+    body = `${ns}${d.slice(0, 4)}00000${d[4]!}`;
+  } else {
+    body = `${ns}${d.slice(0, 5)}0000${last}`;
+  }
+  if (body.length !== 11) return null;
+  const check = computeCheckDigit(body);
+  return body + check.toString();
 }
 
 /**
