@@ -1,315 +1,319 @@
-import { useEffect, useRef, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton } from '@ionic/react';
-import { requireUserId, supabase } from '@services/supabase/client';
-import { useWarehouse } from '@stores/warehouse';
-import { normalizeBarcode, type BarcodeKind } from '@domain/barcodes/normalizeBarcode';
-import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
-import { cents, fromMajorUnits, formatUSD } from '@domain/money/cents';
-import { submitShelfObservation } from '@services/api/observations';
-
-type ScanMode = 'barcode' | 'shelf_tag';
-
-interface ScannerHandle {
-  scan: () => Promise<string | null>;
-}
-
 /**
- * Scan page. Spec §47, §52, §69.
+ * ScanPage — barcode + shelf-tag scan entry.
  *
- * Two modes:
- *   - barcode: native camera scanner (Capacitor) or manual entry, looks up
- *     the product by identifier, writes scan_history.
- *   - shelf_tag: enter the displayed price + item number, writes a real
- *     price_observation via submitShelfObservation.
- *
- * UI uses the COSTCO-SAVER design system: native form controls styled by
- * global.css, segment control for mode, error / success states use the
- * .cs-state / .cs-error conventions.
+ * In offline mode the camera cannot launch. The page presents a realistic
+ * viewfinder UI with a "Demo scan" button that picks a random seed product
+ * and navigates to its detail page.
  */
+
+import { useState } from 'react';
+import { useHistory } from 'react-router';
+import { useApp } from '@data/store';
+import { Card, OfflineBanner, Section } from '@components/UI';
+import { ProductImage } from '@components/ProductImage';
+import type { Product } from '@data/types';
+
+type Mode = 'barcode' | 'shelf_tag' | 'manual';
+
+const RECENT: Array<{ handle: string; product: Product; priceCents: number; when: string }> = [
+  {
+    handle: 'marcus_ny',
+    product: {
+      id: 'p_olive_oil',
+      costco_item_number: '1108024',
+      upc: '0096619111117',
+      name: 'Kirkland Olive Oil 2L',
+      brand: 'KS',
+      size: '2 L',
+      category: 'Pantry',
+      description: '',
+    },
+    priceCents: 2599,
+    when: '2h ago',
+  },
+  {
+    handle: 'jess_qns',
+    product: {
+      id: 'p_samsung_tv',
+      costco_item_number: '1447829',
+      upc: '0880609311115',
+      name: 'Samsung 65" 4K TV',
+      brand: 'Samsung',
+      size: '65 in',
+      category: 'Electronics',
+      description: '',
+    },
+    priceCents: 69999,
+    when: '4h ago',
+  },
+  {
+    handle: 'tomh',
+    product: {
+      id: 'p_whey',
+      costco_item_number: '1141192',
+      upc: '0743820211113',
+      name: 'Optimum Whey 5 lb',
+      brand: 'ON',
+      size: '5 lb',
+      category: 'Sports',
+      description: '',
+    },
+    priceCents: 4999,
+    when: 'yesterday',
+  },
+];
+
 export function ScanPage(): JSX.Element {
-  const { selected } = useWarehouse();
-  const [mode, setMode] = useState<ScanMode>('barcode');
-  const [manualBarcode, setManualBarcode] = useState('');
-  const [manualPrice, setManualPrice] = useState('');
-  const [manualItemNumber, setManualItemNumber] = useState('');
-  const [hasAsterisk, setHasAsterisk] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<string | null>(null);
-  const scannerRef = useRef<ScannerHandle | null>(null);
+  const history = useHistory();
+  const products = useApp((s) => s.products);
+  const [mode, setMode] = useState<Mode>('barcode');
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const mod = await import('@capacitor/barcode-scanner');
-        if (cancelled) return;
-        const Sc = mod.CapacitorBarcodeScanner;
-        scannerRef.current = {
-          scan: async () => {
-            const result = await Sc.scanBarcode({ hint: 17 /* ALL */ });
-            if (result && (result as { ScanResult?: string }).ScanResult) {
-              return (result as { ScanResult: string }).ScanResult;
-            }
-            return null;
-          },
-        };
-      } catch (err) {
-        // Web runtime: scanner plugin not available, fall back to manual entry.
-        console.warn('Native barcode scanner unavailable, using manual entry only', err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function onBarcodeScanned(content: string): Promise<void> {
-    const normalized = normalizeBarcode(content);
-    if (!normalized.value) {
-      setError('Empty barcode.');
-      return;
-    }
-    if (normalized.kind === 'UNKNOWN' || !normalized.checkDigitValid) {
-      setManualBarcode(content);
-      setError(
-        normalized.checkDigitValid
-          ? 'That looked like an internal item number. Fill in the product info and submit.'
-          : 'Barcode check digit is wrong. Re-scan or enter manually.',
-      );
-      return;
-    }
-    const { data, error: err } = await supabase()
-      .from('product_identifiers')
-      .select('product_id, products(id, canonical_name, brand)')
-      .eq('identifier_type', normalized.kind as BarcodeKind)
-      .eq('normalized_value', normalized.value)
-      .limit(1)
-      .maybeSingle();
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    const product = (data as { products: { id: string } | { id: string }[] | null } | null)?.products;
-    const productId = Array.isArray(product) ? product[0]?.id : product?.id;
-    if (productId) {
-      try {
-        const userId = await requireUserId();
-        await supabase().from('scan_history').insert({
-          user_id: userId,
-          product_id: productId,
-          barcode_normalized: normalized.value,
-          warehouse_id: selected?.id ?? null,
-        });
-      } catch {
-        // History is best-effort; lookup still succeeds.
-      }
-      window.location.assign(`/product/${productId}`);
-    } else {
-      setManualBarcode(content);
-      setError('Unknown product. Fill in the form to create it.');
-    }
-  }
-
-  async function submitManualShelfObservation(): Promise<void> {
-    if (!selected) {
-      setError('Pick a warehouse first.');
-      return;
-    }
-    const priceMajor = Number(manualPrice);
-    if (!Number.isFinite(priceMajor) || priceMajor < 0) {
-      setError('Enter a valid price.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const priceCents = fromMajorUnits(priceMajor);
-      let productId: string | null = null;
-      const item = manualItemNumber.trim();
-      if (item) {
-        const { data, error: idErr } = await supabase()
-          .from('product_identifiers')
-          .select('product_id')
-          .eq('identifier_type', 'COSTCO_ITEM_NUMBER')
-          .eq('normalized_value', item)
-          .maybeSingle();
-        if (idErr) throw idErr;
-        productId = (data as { product_id: string } | null)?.product_id ?? null;
-      }
-      if (!productId && manualBarcode.trim()) {
-        const normalized = normalizeBarcode(manualBarcode);
-        if (normalized.value) {
-          const { data } = await supabase()
-            .from('product_identifiers')
-            .select('product_id')
-            .eq('normalized_value', normalized.value)
-            .limit(1)
-            .maybeSingle();
-          productId = (data as { product_id: string } | null)?.product_id ?? null;
-        }
-      }
-      if (!productId) {
-        setError(
-          'Unknown product. Scan or look up the barcode first, or enter a Costco item number already in the catalog.',
-        );
-        return;
-      }
-      await submitShelfObservation({
-        productId,
-        warehouseId: selected.id,
-        priceCents: priceCents as number,
-        hasAsterisk,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      const classification = classifyPriceCode({ priceCents, hasAsterisk });
-      setLastResult(`Submitted: ${formatUSD(priceCents)} (${classification.classification})`);
-      window.location.assign(`/product/${productId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit observation');
-    } finally {
-      setBusy(false);
-    }
-  }
+  const onDemoScan = () => {
+    const p = products[Math.floor(Math.random() * products.length)];
+    if (p) history.push(`/product/${p.id}`);
+  };
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Scan</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <div className="cs-page">
-          <header className="cs-header">
-            <span className="cs-header__eyebrow">Submit</span>
-            <h2 className="cs-header__title">What did you see?</h2>
-            <p className="cs-header__sub">A barcode, a price tag, or an item number.</p>
-          </header>
+    <>
+      <OfflineBanner />
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '20px 16px 100px',
+          color: '#E5E7EB',
+        }}
+      >
+        <h1
+          style={{
+            margin: '0 0 6px',
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#F9FAFB',
+          }}
+        >
+          Scan
+        </h1>
+        <div style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 16 }}>
+          Point your camera at a barcode or shelf tag.
+        </div>
 
-          <div className="cs-segment" role="tablist" aria-label="Scan mode">
+        {/* Mode toggle */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            background: '#111827',
+            padding: 4,
+            borderRadius: 999,
+            marginBottom: 16,
+          }}
+        >
+          {(['barcode', 'shelf_tag', 'manual'] as Mode[]).map((m) => (
             <button
-              type="button"
-              className="cs-segment__item"
-              role="tab"
-              aria-pressed={mode === 'barcode'}
-              onClick={() => setMode('barcode')}
+              key={m}
+              onClick={() => setMode(m)}
+              style={{
+                flex: 1,
+                background: mode === m ? '#34D399' : 'transparent',
+                color: mode === m ? '#0B1220' : '#E5E7EB',
+                border: 0,
+                borderRadius: 999,
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                cursor: 'pointer',
+              }}
             >
-              Barcode
+              {m === 'barcode' ? 'Barcode' : m === 'shelf_tag' ? 'Shelf tag' : 'Manual'}
+            </button>
+          ))}
+        </div>
+
+        {/* Viewfinder */}
+        <Card
+          padding={0}
+          style={{
+            marginBottom: 16,
+            overflow: 'hidden',
+            aspectRatio: '16 / 9',
+            position: 'relative',
+            background: 'linear-gradient(135deg, #0B1220 0%, #1E293B 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: '70%',
+              aspectRatio: '1.4 / 1',
+              maxWidth: 280,
+              borderRadius: 14,
+              border: '2px solid rgba(52, 211, 153, 0.4)',
+              position: 'relative',
+              animation: 'pulse 2s ease-in-out infinite',
+            }}
+          >
+            {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((c) => {
+              const isTop = c.includes('top');
+              const isLeft = c.includes('left');
+              return (
+                <div
+                  key={c}
+                  style={{
+                    position: 'absolute',
+                    top: isTop ? -2 : undefined,
+                    bottom: !isTop ? -2 : undefined,
+                    left: isLeft ? -2 : undefined,
+                    right: !isLeft ? -2 : undefined,
+                    width: 24,
+                    height: 24,
+                    borderTop: isTop ? '3px solid #34D399' : 'none',
+                    borderBottom: !isTop ? '3px solid #34D399' : 'none',
+                    borderLeft: isLeft ? '3px solid #34D399' : 'none',
+                    borderRight: !isLeft ? '3px solid #34D399' : 'none',
+                    borderTopLeftRadius: isTop && isLeft ? 8 : 0,
+                    borderTopRightRadius: isTop && !isLeft ? 8 : 0,
+                    borderBottomLeftRadius: !isTop && isLeft ? 8 : 0,
+                    borderBottomRightRadius: !isTop && !isLeft ? 8 : 0,
+                  }}
+                />
+              );
+            })}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                color: '#9CA3AF',
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: 0.5,
+                textAlign: 'center',
+                padding: 8,
+              }}
+            >
+              Center the {mode === 'barcode' ? 'barcode' : 'shelf tag'} in the box
+            </div>
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: 12,
+              background: 'rgba(11, 18, 32, 0.7)',
+              borderRadius: 999,
+              padding: '4px 10px',
+              fontSize: 11,
+              color: '#E5E7EB',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: '#EF4444' }} />
+            Camera offline
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              left: 12,
+              right: 12,
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <button
+              onClick={onDemoScan}
+              style={{
+                background: '#34D399',
+                color: '#0B1220',
+                border: 0,
+                borderRadius: 999,
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(52, 211, 153, 0.4)',
+              }}
+            >
+              ✨ Demo scan
             </button>
             <button
-              type="button"
-              className="cs-segment__item"
-              role="tab"
-              aria-pressed={mode === 'shelf_tag'}
-              onClick={() => setMode('shelf_tag')}
+              onClick={() => history.push('/search')}
+              style={{
+                background: 'rgba(11, 18, 32, 0.85)',
+                color: '#E5E7EB',
+                border: '1px solid #374151',
+                borderRadius: 999,
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
             >
-              Shelf tag
+              Type barcode
             </button>
           </div>
+        </Card>
 
-          {mode === 'barcode' && (
-            <section className="cs-card cs-stack">
-              <h3 className="cs-strong" style={{ margin: 0 }}>Product barcode</h3>
-              <p className="cs-muted" style={{ margin: 0 }}>Native cameras open automatically. Web falls back to manual entry.</p>
-              <button
-                type="button"
-                className="cs-button"
-                onClick={() => scannerRef.current?.scan().then((c) => c ? onBarcodeScanned(c) : null).catch((err: Error) => setError(err.message ?? 'Scanner failed'))}
+        {/* Recent scans */}
+        <Section title="Recent in your area">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {RECENT.map((r, i) => (
+              <Card
+                key={i}
+                padding={12}
+                onClick={() => history.push(`/product/${r.product.id}`)}
+                style={{ display: 'flex', gap: 12, alignItems: 'center' }}
               >
-                Open scanner
-              </button>
-              <label className="cs-field">
-                <span className="cs-field__label">Manual entry</span>
-                <input
-                  className="cs-field__input"
-                  value={manualBarcode}
-                  inputMode="numeric"
-                  onChange={(e) => setManualBarcode(e.target.value)}
-                  placeholder="UPC, EAN, or Costco item number"
-                />
-              </label>
-              <button
-                type="button"
-                className="cs-button cs-button--ghost"
-                onClick={() => onBarcodeScanned(manualBarcode).catch((err: Error) => setError(err.message ?? 'Lookup failed'))}
-                disabled={!manualBarcode}
-                aria-disabled={!manualBarcode}
-              >
-                Look up
-              </button>
-            </section>
-          )}
+                <ProductImage product={r.product} size={48} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: '#F9FAFB',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {r.product.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                    @{r.handle} · {r.when}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: '#34D399',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  ${(r.priceCents / 100).toFixed(2)}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </Section>
 
-          {mode === 'shelf_tag' && (
-            <section className="cs-card cs-stack">
-              <h3 className="cs-strong" style={{ margin: 0 }}>Shelf tag</h3>
-              <p className="cs-muted" style={{ margin: 0 }}>Enter the displayed price and the Costco item number if visible.</p>
-              <label className="cs-field">
-                <span className="cs-field__label">Price (USD)</span>
-                <input
-                  className="cs-field__input"
-                  inputMode="decimal"
-                  value={manualPrice}
-                  onChange={(e) => setManualPrice(e.target.value)}
-                  placeholder="e.g. 19.97"
-                />
-              </label>
-              <label className="cs-field">
-                <span className="cs-field__label">Costco item number (optional)</span>
-                <input
-                  className="cs-field__input"
-                  inputMode="numeric"
-                  value={manualItemNumber}
-                  onChange={(e) => setManualItemNumber(e.target.value)}
-                  placeholder="e.g. 1234567"
-                />
-              </label>
-              <label className="cs-field cs-field--row">
-                <span className="cs-field__label">Asterisk on tag (no restock)</span>
-                <input
-                  type="checkbox"
-                  className="cs-field__checkbox"
-                  checked={hasAsterisk}
-                  onChange={(e) => setHasAsterisk(e.target.checked)}
-                />
-              </label>
-              <button
-                type="button"
-                className="cs-button"
-                onClick={submitManualShelfObservation}
-                disabled={busy || !manualPrice || !selected}
-                aria-disabled={busy || !manualPrice || !selected}
-              >
-                {busy ? 'Submitting…' : 'Submit observation'}
-              </button>
-              {!selected && (
-                <p className="cs-muted">Pick a warehouse on Home first.</p>
-              )}
-            </section>
-          )}
-
-          {error && (
-            <p role="alert" className="cs-error">{error}</p>
-          )}
-          {lastResult && (
-            <p role="status" className="cs-success">{lastResult}</p>
-          )}
-          {(() => {
-            const code = classifyPriceCode({ priceCents: cents(Math.round(Number(manualPrice || 0) * 100)), hasAsterisk });
-            if (Number.isFinite(Number(manualPrice)) && Number(manualPrice) > 0) {
-              return (
-                <p className="cs-muted">
-                  Markdown: <span className="cs-pill cs-pill--clearance">{code.classification}</span>
-                  {code.hasAsterisk && <> · <span className="cs-pill cs-pill--danger">asterisk</span></>}
-                </p>
-              );
-            }
-            return null;
-          })()}
-        </div>
-      </IonContent>
-    </IonPage>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
+            50% { box-shadow: 0 0 0 16px rgba(52, 211, 153, 0); }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }

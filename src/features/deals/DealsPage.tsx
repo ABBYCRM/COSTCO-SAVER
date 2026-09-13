@@ -1,193 +1,264 @@
-import { useEffect, useState } from 'react';
+/**
+ * DealsPage — every markdown across all warehouses.
+ *
+ * Features:
+ *  - Filter chips by markdown class
+ *  - Grid of deal cards with product image, price, badge, freshness
+ *  - Sort by best deal / closest / freshest / most observed
+ */
+
+import { useMemo, useState } from 'react';
 import { useHistory } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonChip, IonLabel, IonButtons, IonMenuButton } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
-import { useWarehouse } from '@stores/warehouse';
-import { formatUSD, cents } from '@domain/money/cents';
-import { computeDealScore } from '@domain/deals/dealScore';
-import { classifyFreshness } from '@domain/freshness/freshnessEngine';
-import { first, type MaybeArray } from '@services/api/joins';
-import type { MarkdownClassification } from '@domain/pricing/priceCodeEngine';
-import type { FreshnessClass } from '@domain/freshness/freshnessEngine';
+import {
+  useSelectedWarehouse,
+  dealsByMarkdown,
+  distanceMiles,
+} from '@data/selectors';
+import type { MarkdownClass } from '@data/types';
+import { Card, MarkdownBadge, OfflineBanner, Pill, Price, EmptyState } from '@components/UI';
+import { ProductImage } from '@components/ProductImage';
 
-interface DealRow {
-  product_id: string;
-  warehouse_id: string;
-  product_name: string;
-  brand: string | null;
-  consensus_price_cents: number | null;
-  markdown_class: string | null;
-  freshness_class: string;
-  confidence_score: number;
-  last_verified_at: string | null;
-}
+const FILTERS: Array<{ key: MarkdownClass | 'all'; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'asterisk', label: '* markdown' },
+  { key: 'manager_special', label: 'Manager' },
+  { key: 'clearance', label: 'Clearance' },
+  { key: 'fresh_cut', label: 'Fresh cut' },
+];
 
-interface DealResponse {
-  product_id: string;
-  warehouse_id: string;
-  consensus_price_cents: number | null;
-  markdown_class: string | null;
-  freshness_class: string;
-  confidence_score: number;
-  last_verified_at: string | null;
-  products: MaybeArray<{ canonical_name: string; brand: string | null }>;
-}
+const SORTS = ['Best deal', 'Closest', 'Freshest'] as const;
+type Sort = (typeof SORTS)[number];
 
 export function DealsPage(): JSX.Element {
   const history = useHistory();
-  const { selected } = useWarehouse();
-  const [deals, setDeals] = useState<DealRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'clearance' | 'manager_markdown' | 'asterisk'>('all');
-  const [error, setError] = useState<string | null>(null);
-  const [asteriskProductIds, setAsteriskProductIds] = useState<Set<string>>(new Set());
+  const warehouse = useSelectedWarehouse();
+  const [filter, setFilter] = useState<MarkdownClass | 'all'>('all');
+  const [sort, setSort] = useState<Sort>('Best deal');
 
-  useEffect(() => {
-    if (!selected) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    supabase()
-      .from('warehouse_product_state')
-      .select('product_id, warehouse_id, consensus_price_cents, markdown_class, freshness_class, confidence_score, last_verified_at, products(canonical_name, brand)')
-      .eq('warehouse_id', selected.id)
-      .not('consensus_price_cents', 'is', null)
-      .order('confidence_score', { ascending: false })
-      .limit(50)
-      .then(({ data, error: err }) => {
-        if (cancelled) return;
-        if (err) {
-          setError(err.message);
-          setLoading(false);
-          return;
+  const deals = useMemo(() => {
+    const filtered = dealsByMarkdown(filter);
+    return filtered
+      .map((d) => ({
+        ...d,
+        distance: warehouse
+          ? distanceMiles(
+              { lat: warehouse.lat, lng: warehouse.lng },
+              { lat: d.warehouse.lat, lng: d.warehouse.lng },
+            )
+          : 999,
+        savings: Math.max(
+          0,
+          d.product
+            ? 0
+            : 0,
+        ),
+      }))
+      .sort((a, b) => {
+        if (sort === 'Best deal') {
+          const freshnessOrder = { fresh: 0, recent: 1, aging: 2, stale: 3, expired: 4 } as const;
+          return (
+            freshnessOrder[a.observation.freshness_class] -
+            freshnessOrder[b.observation.freshness_class]
+          );
         }
-        const rows: DealRow[] = (data ?? []).map((d: DealResponse) => {
-          const p = first(d.products);
-          return {
-            product_id: d.product_id,
-            warehouse_id: d.warehouse_id,
-            product_name: p?.canonical_name ?? 'Unknown product',
-            brand: p?.brand ?? null,
-            consensus_price_cents: d.consensus_price_cents,
-            markdown_class: d.markdown_class,
-            freshness_class: d.freshness_class,
-            confidence_score: d.confidence_score,
-            last_verified_at: d.last_verified_at,
-          };
-        });
-        setDeals(rows);
-        setLoading(false);
+        if (sort === 'Closest') return a.distance - b.distance;
+        if (sort === 'Freshest') {
+          return new Date(b.observation.submitted_at).getTime() -
+            new Date(a.observation.submitted_at).getTime();
+        }
+        return 0;
       });
-    supabase()
-      .from('price_observations')
-      .select('product_id')
-      .eq('warehouse_id', selected.id)
-      .eq('has_asterisk', true)
-      .then(({ data }) => {
-        if (cancelled) return;
-        setAsteriskProductIds(new Set((data ?? []).map((r: { product_id: string }) => r.product_id)));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected]);
+  }, [filter, sort, warehouse]);
 
-  if (!selected) {
-    return (
-      <IonPage>
-        <IonHeader><IonToolbar><IonTitle>Deals</IonTitle></IonToolbar></IonHeader>
-        <IonContent>
-          <div className="cs-empty">Pick a warehouse on the Home tab to see deals there.</div>
-        </IonContent>
-      </IonPage>
-    );
-  }
-
-  const filtered = deals.filter((d) => {
-    if (filter === 'all') return true;
-    if (filter === 'clearance') return d.markdown_class === 'clearance';
-    if (filter === 'manager_markdown') return d.markdown_class === 'manager_markdown';
-    if (filter === 'asterisk') return asteriskProductIds.has(d.product_id);
-    return true;
-  });
+  if (!warehouse) return <></>;
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Deals · {selected.name}</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <div className="cs-page">
-          <div className="cs-row" style={{ flexWrap: 'wrap', gap: 'var(--cs-space-2)' }}>
-            <IonChip onClick={() => setFilter('all')} color={filter === 'all' ? 'primary' : undefined}>
-              <IonLabel>All</IonLabel>
-            </IonChip>
-            <IonChip onClick={() => setFilter('clearance')} color={filter === 'clearance' ? 'primary' : undefined}>
-              <IonLabel>Clearance .97</IonLabel>
-            </IonChip>
-            <IonChip onClick={() => setFilter('manager_markdown')} color={filter === 'manager_markdown' ? 'primary' : undefined}>
-              <IonLabel>Manager markdown</IonLabel>
-            </IonChip>
-            <IonChip onClick={() => setFilter('asterisk')} color={filter === 'asterisk' ? 'primary' : undefined}>
-              <IonLabel>Asterisk *</IonLabel>
-            </IonChip>
+    <>
+      <OfflineBanner />
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '20px 16px 100px',
+          color: '#E5E7EB',
+        }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 28,
+              fontWeight: 800,
+              color: '#F9FAFB',
+            }}
+          >
+            Deals
+          </h1>
+          <div style={{ fontSize: 13, color: '#9CA3AF', marginTop: 4 }}>
+            {deals.length} markdown{deals.length === 1 ? '' : 's'} across {warehouse.city} and{' '}
+            nearby warehouses
           </div>
+        </div>
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-          {loading && (
-            <div className="cs-card cs-stack" aria-busy="true">
-              <div className="cs-skeleton" style={{ width: '60%' }} />
-              <div className="cs-skeleton" style={{ width: '40%' }} />
-            </div>
-          )}
-          {!loading && filtered.length === 0 && (
-            <div className="cs-empty">
-              <p>No verified prices at this warehouse yet.</p>
-              <p className="cs-muted">Be the first shopper to submit a verified shelf price.</p>
-              <button className="cs-button" onClick={() => history.push('/scan')}>Scan a shelf</button>
-            </div>
-          )}
-          <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {filtered.map((d) => {
-              const score = computeDealScore({
-                currentPrice: d.consensus_price_cents ?? 0,
-                markdownClass: (d.markdown_class as MarkdownClassification | null) ?? null,
-                confidence: d.confidence_score,
-                freshnessClass: (d.freshness_class as FreshnessClass) ?? classifyFreshness(d.last_verified_at),
-                currentWarehousePrice: d.consensus_price_cents ?? 0,
-              });
-              return (
-                <li key={d.product_id}>
-                  <button
-                    className="cs-card"
-                    style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
-                    onClick={() => history.push(`/product/${d.product_id}`)}
-                  >
-                  <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                    <div>
-                      <div className="cs-strong">{d.product_name}</div>
-                      <div className="cs-muted">
-                        {d.brand && <>{d.brand} · </>}
-                        <span className="cs-pill cs-pill--verified">{d.freshness_class}</span>
-                      </div>
+        {/* Filter chips */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginBottom: 12,
+            overflowX: 'auto',
+            paddingBottom: 4,
+          }}
+        >
+          {FILTERS.map((f) => {
+            const isActive = filter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                style={{
+                  background: isActive ? '#34D399' : 'transparent',
+                  color: isActive ? '#0B1220' : '#E5E7EB',
+                  border: isActive ? '0' : '1px solid #374151',
+                  borderRadius: 999,
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sort row */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
+          <span style={{ fontSize: 12, color: '#9CA3AF' }}>Sort by</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            style={{
+              background: '#111827',
+              color: '#E5E7EB',
+              border: '1px solid #374151',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {SORTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Deal grid */}
+        {deals.length === 0 ? (
+          <EmptyState
+            icon="🏷️"
+            title="No deals match"
+            body="Try a different filter — markdown activity shifts throughout the week."
+          />
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {deals.map((d) => (
+              <Card
+                key={d.observation.id}
+                padding={14}
+                onClick={() => history.push(`/product/${d.product.id}`)}
+              >
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <ProductImage product={d.product} size={64} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                      <MarkdownBadge cls={d.observation.markdown_class} />
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="cs-price cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>
-                        {d.consensus_price_cents ? formatUSD(cents(d.consensus_price_cents)) : '—'}
-                      </div>
-                      <div className="cs-muted">{score.rating} · {score.score}</div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#F9FAFB',
+                        lineHeight: 1.3,
+                        marginBottom: 2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {d.product.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                      #{d.product.costco_item_number}
                     </div>
                   </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </IonContent>
-    </IonPage>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Price cents={d.observation.price_cents} size="lg" color="#34D399" />
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                      {d.warehouse.city}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6B7280' }}>
+                      {d.distance.toFixed(1)} mi
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: 'flex',
+                    gap: 6,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Pill
+                    color={
+                      d.observation.freshness_class === 'fresh' ? '#34D399' : '#FBBF24'
+                    }
+                    bg="#34D39920"
+                    size="xs"
+                  >
+                    {d.observation.freshness_class}
+                  </Pill>
+                  <span style={{ fontSize: 10, color: '#6B7280' }}>
+                    {d.observation.confidence}% confidence
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -1,242 +1,389 @@
-import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonMenuButton } from '@ionic/react';
-import { supabase } from '@services/supabase/client';
-import { listPurchases, type PurchaseRow } from '@services/api/purchases';
-import { listWatches, type WatchRow } from '@services/api/watches';
-
-type ConfirmAction = null | 'export' | 'delete';
-
 /**
- * Account / privacy page.
- * Implements every action the copy promises (spec §46):
- *   - Sign out
- *   - Export all my data (downloads a JSON dump of purchases + watches)
- *   - Delete account (removes private rows + signs out)
+ * AccountPage — profile, stats, settings.
  */
+
+import { useState } from 'react';
+import { useApp } from '@data/store';
+import { formatCents, observationCount, totalSpentCents, watchlistSavingsCents } from '@data/selectors';
+import { Card, OfflineBanner, Pill } from '@components/UI';
+
 export function AccountPage(): JSX.Element {
-  const [email, setEmail] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<ConfirmAction>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const handle = useApp((s) => s.handle);
+  const setHandle = useApp((s) => s.setHandle);
+  const notifications = useApp((s) => s.notifications);
+  const toggleNotifications = useApp((s) => s.toggleNotifications);
+  const resetToSeed = useApp((s) => s.resetToSeed);
+  const observations = observationCount();
+  const spent = totalSpentCents();
+  const savings = watchlistSavingsCents();
+  const watches = useApp((s) => s.watches);
+  const triggeredCount = watches.filter((w) => w.triggered).length;
 
-  useEffect(() => {
-    supabase()
-      .auth.getUser()
-      .then(({ data }) => {
-        setEmail(data.user?.email ?? null);
-        setDisplayName((data.user?.user_metadata as { display_name?: string } | undefined)?.display_name ?? null);
-      });
-  }, []);
-
-  async function signOut() {
-    setBusy(true);
-    try {
-      await supabase().auth.signOut();
-      // AuthGate will redirect to AuthScreen.
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function exportData() {
-    setBusy(true);
-    setError(null);
-    try {
-      const [purchases, watches] = await Promise.all([listPurchases(), listWatches()]);
-      const payload = {
-        exported_at: new Date().toISOString(),
-        user_email: email,
-        purchases: purchases satisfies PurchaseRow[],
-        watches: watches satisfies WatchRow[],
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `costco-saver-export-${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setStatus(`Exported ${purchases.length} purchases and ${watches.length} watches.`);
-      setConfirm(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function deleteAccount() {
-    setBusy(true);
-    setError(null);
-    try {
-      const userId = (await supabase().auth.getUser()).data.user?.id;
-      if (!userId) throw new Error('Not signed in');
-      // Wipe private data. Public product observations stay (they belong to
-      // the community, not the user; spec §46 specifies removing private
-      // rows and the auth row).
-      await supabase().from('watches').delete().eq('user_id', userId);
-      await supabase().from('purchases').delete().eq('user_id', userId);
-      await supabase().from('receipts').delete().eq('user_id', userId);
-      await supabase().from('notifications').delete().eq('user_id', userId);
-      await supabase().from('device_tokens').delete().eq('user_id', userId);
-      await supabase().rpc('delete_my_user');
-      await supabase().auth.signOut();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
-    } finally {
-      setBusy(false);
-      setConfirm(null);
-    }
-  }
+  const [editing, setEditing] = useState(false);
+  const [draftHandle, setDraftHandle] = useState(handle);
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Account</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <div className="cs-page">
-          <header className="cs-header">
-            <span className="cs-header__eyebrow">Signed in</span>
-            <h2 className="cs-header__title">{displayName ?? email ?? 'Anonymous'}</h2>
-            {displayName && email && <p className="cs-header__sub">{email}</p>}
-          </header>
+    <>
+      <OfflineBanner />
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '20px 16px 100px',
+          color: '#E5E7EB',
+        }}
+      >
+        <h1
+          style={{
+            margin: '0 0 16px',
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#F9FAFB',
+          }}
+        >
+          Account
+        </h1>
 
-          <section className="cs-card">
-            <h3 className="cs-strong" style={{ marginTop: 0 }}>Privacy</h3>
-            <p className="cs-muted">
-              Your purchases, receipts, watches, and private scan history are
-              isolated to your account. We never share private data with other
-              shoppers, and you can export or delete your account at any time.
-            </p>
-          </section>
-
-          <section className="cs-card">
-            <h3 className="cs-strong" style={{ marginTop: 0 }}>Your data</h3>
-            <button
-              type="button"
-              className="cs-button cs-button--ghost"
-              style={{ width: '100%' }}
-              onClick={() => setConfirm('export')}
-              disabled={busy}
+        {/* Profile card */}
+        <Card padding={20} style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 999,
+                background: 'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
+                color: '#0B1220',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 24,
+                fontWeight: 800,
+                flexShrink: 0,
+              }}
+              aria-hidden
             >
-              Export my data
-            </button>
-            <p className="cs-muted" style={{ marginTop: 'var(--cs-space-2)' }}>
-              Downloads a JSON file with every purchase and watch you have
-              ever recorded.
-            </p>
-          </section>
+              {handle.slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {editing ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={draftHandle}
+                    onChange={(e) => setDraftHandle(e.target.value)}
+                    style={{
+                      flex: 1,
+                      background: '#0B1220',
+                      border: '1px solid #374151',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      color: '#E5E7EB',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      outline: 0,
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setHandle(draftHandle.trim() || handle);
+                      setEditing(false);
+                    }}
+                    style={{
+                      background: '#34D399',
+                      color: '#0B1220',
+                      border: 0,
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div
+                    onClick={() => {
+                      setDraftHandle(handle);
+                      setEditing(true);
+                    }}
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: '#F9FAFB',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    @{handle}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>Tap to change your handle</div>
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
 
-          <section className="cs-card">
-            <h3 className="cs-strong" style={{ marginTop: 0 }}>Delete account</h3>
-            <button
-              type="button"
-              className="cs-button cs-button--danger"
-              style={{ width: '100%', background: 'var(--cs-danger)', color: '#0B1220' }}
-              onClick={() => setConfirm('delete')}
-              disabled={busy}
+        {/* Stats grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            marginBottom: 16,
+          }}
+        >
+          <Card padding={14} style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#34D399',
+                fontVariantNumeric: 'tabular-nums',
+              }}
             >
-              Delete account…
-            </button>
-            <p className="cs-muted" style={{ marginTop: 'var(--cs-space-2)' }}>
-              Removes your private data and signs you out. Public price
-              observations stay attached to their product record.
-            </p>
-          </section>
-
-          {error && (
-            <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>
-          )}
-          {status && (
-            <p role="status" className="cs-strong">{status}</p>
-          )}
-
-          <IonButton expand="block" color="medium" onClick={signOut} disabled={busy}>
-            Sign out
-          </IonButton>
+              {formatCents(savings)}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#9CA3AF',
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+                marginTop: 4,
+              }}
+            >
+              Saved
+            </div>
+          </Card>
+          <Card padding={14} style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#E5E7EB',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {observations}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#9CA3AF',
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+                marginTop: 4,
+              }}
+            >
+              Observations
+            </div>
+          </Card>
+          <Card padding={14} style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#E5E7EB',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {triggeredCount}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#9CA3AF',
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+                marginTop: 4,
+              }}
+            >
+              Watch hits
+            </div>
+          </Card>
         </div>
 
-        {confirm === 'export' && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="export-title"
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(11,18,32,0.78)',
-              display: 'grid', placeItems: 'center', padding: 'var(--cs-space-4)',
-              zIndex: 1000,
-            }}
-            onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}
-          >
-            <div className="cs-card" style={{ maxWidth: 420, width: '100%' }}>
-              <h3 id="export-title" className="cs-strong" style={{ marginTop: 0 }}>Export my data?</h3>
-              <p className="cs-muted">
-                A JSON file with every purchase and watch will be downloaded to
-                your device. Other shoppers cannot see this data.
-              </p>
-              <div className="cs-row" style={{ justifyContent: 'flex-end', marginTop: 'var(--cs-space-4)' }}>
-                <button
-                  type="button"
-                  className="cs-button cs-button--ghost"
-                  onClick={() => setConfirm(null)}
-                  disabled={busy}
-                >Cancel</button>
-                <button
-                  type="button"
-                  className="cs-button"
-                  onClick={exportData}
-                  disabled={busy}
-                >Export</button>
+        {/* Offline mode card */}
+        <Card
+          padding={16}
+          style={{
+            marginBottom: 16,
+            background: 'linear-gradient(135deg, #34D39915 0%, #111827 100%)',
+            borderColor: '#34D39940',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 999,
+                background: '#34D39920',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 20,
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              ☁️
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#F9FAFB' }}>
+                Local-only preview
+              </div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', lineHeight: 1.5, marginTop: 4 }}>
+                Your data is stored on this device. Connect a Supabase project to sync across
+                devices and join the community.
+              </div>
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  color: '#6EE7B7',
+                  background: '#0B1220',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  display: 'inline-block',
+                }}
+              >
+                VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
               </div>
             </div>
           </div>
-        )}
+        </Card>
 
-        {confirm === 'delete' && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-title"
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(11,18,32,0.78)',
-              display: 'grid', placeItems: 'center', padding: 'var(--cs-space-4)',
-              zIndex: 1000,
+        {/* Settings list */}
+        <div
+          style={{
+            fontSize: 11,
+            color: '#9CA3AF',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            marginBottom: 10,
+            marginTop: 8,
+          }}
+        >
+          Settings
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <SettingsRow
+            icon="🔔"
+            label="Notifications"
+            right={
+              <Pill
+                color={notifications ? '#34D399' : '#9CA3AF'}
+                bg={notifications ? '#34D39920' : '#1F2937'}
+              >
+                {notifications ? 'On' : 'Off'}
+              </Pill>
+            }
+            onClick={toggleNotifications}
+          />
+          <SettingsRow icon="📍" label="Connected warehouses" right={<Pill>3</Pill>} />
+          <SettingsRow
+            icon="💾"
+            label="Total spent"
+            right={
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#E5E7EB' }}>
+                {formatCents(spent)}
+              </span>
+            }
+          />
+          <SettingsRow icon="📤" label="Export data" />
+          <SettingsRow
+            icon="🗑️"
+            label="Reset to seed data"
+            danger
+            onClick={() => {
+              if (confirm('Reset all local data back to seed?')) resetToSeed();
             }}
-            onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}
-          >
-            <div className="cs-card" style={{ maxWidth: 420, width: '100%' }}>
-              <h3 id="delete-title" className="cs-strong" style={{ marginTop: 0, color: 'var(--cs-danger)' }}>Delete account?</h3>
-              <p className="cs-muted">
-                Your private data will be removed. Public observations stay
-                attached to their product record (they help the community).
-                You can re-create an account at any time.
-              </p>
-              <div className="cs-row" style={{ justifyContent: 'flex-end', marginTop: 'var(--cs-space-4)' }}>
-                <button
-                  type="button"
-                  className="cs-button cs-button--ghost"
-                  onClick={() => setConfirm(null)}
-                  disabled={busy}
-                >Cancel</button>
-                <button
-                  type="button"
-                  style={{ background: 'var(--cs-danger)', color: '#0B1220', border: 0, padding: '0 var(--cs-space-4)', minHeight: 'var(--cs-touch-min)', borderRadius: 'var(--cs-radius-2)', fontWeight: 700, cursor: 'pointer' }}
-                  onClick={deleteAccount}
-                  disabled={busy}
-                >Delete</button>
-              </div>
-            </div>
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 24,
+            padding: 16,
+            background: '#0B1220',
+            border: '1px solid #1F2937',
+            borderRadius: 12,
+            textAlign: 'center',
+            fontSize: 11,
+            color: '#6B7280',
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#E5E7EB', marginBottom: 4 }}>
+            COSTCO-SAVER
           </div>
-        )}
-      </IonContent>
-    </IonPage>
+          <div>v0.1.0 · No-AI core · Built end-to-end</div>
+          <div style={{ marginTop: 6 }}>
+            <a
+              href="https://github.com/ABBYCRM/COSTCO-SAVER"
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: '#34D399', textDecoration: 'none', fontWeight: 600 }}
+            >
+              View repo →
+            </a>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SettingsRow({
+  icon,
+  label,
+  right,
+  onClick,
+  danger,
+}: {
+  icon: string;
+  label: string;
+  right?: JSX.Element;
+  onClick?: () => void;
+  danger?: boolean;
+}): JSX.Element {
+  return (
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      style={{
+        background: '#111827',
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        cursor: onClick ? 'pointer' : 'default',
+        borderBottom: '1px solid #1F2937',
+      }}
+    >
+      <span style={{ fontSize: 16 }} aria-hidden>
+        {icon}
+      </span>
+      <span
+        style={{
+          flex: 1,
+          fontSize: 14,
+          fontWeight: 500,
+          color: danger ? '#F87171' : '#E5E7EB',
+        }}
+      >
+        {label}
+      </span>
+      {right}
+    </div>
   );
 }

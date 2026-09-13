@@ -1,126 +1,210 @@
-import { useEffect, useState } from 'react';
+/**
+ * SearchPage — search products by barcode, item #, or name.
+ *
+ * Live result list, sticky input, mode segmented control.
+ */
+
+import { useMemo, useState } from 'react';
 import { useHistory } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonBackButton, IonButtons } from '@ionic/react';
-import { searchProducts, type SearchHit } from '@services/api/search';
+import { useApp } from '@data/store'; import { useSelectedWarehouse } from '@data/selectors';
+import { Card, EmptyState, OfflineBanner } from '@components/UI';
+import { ProductImage } from '@components/ProductImage';
+
+type Mode = 'name' | 'barcode' | 'item';
+
+const MODES: Array<{ key: Mode; label: string; placeholder: string }> = [
+  { key: 'name', label: 'Name', placeholder: "Try 'Kirkland', 'rotisserie', 'Bounty'…" },
+  { key: 'barcode', label: 'Barcode', placeholder: 'Enter a UPC, EAN, or GTIN…' },
+  { key: 'item', label: 'Item #', placeholder: '6-digit Costco item number…' },
+];
 
 export function SearchPage(): JSX.Element {
   const history = useHistory();
-  const [q, setQ] = useState('');
-  const [hits, setHits] = useState<SearchHit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const products = useApp((s) => s.products);
+  const observations = useApp((s) => s.observations);
+  const warehouse = useSelectedWarehouse();
+  const [mode, setMode] = useState<Mode>('name');
+  const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    if (!q.trim()) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    const timer = setTimeout(() => {
-      searchProducts(q)
-        .then((rows) => {
-          if (cancelled) return;
-          setHits(rows);
-          setLoading(false);
-        })
-        .catch((err: Error) => {
-          if (cancelled) return;
-          setError(err.message);
-          setLoading(false);
-        });
-    }, 200);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [q]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return products
+      .filter((p) => {
+        if (mode === 'name') return p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
+        if (mode === 'barcode') return p.upc.includes(q.replace(/\s/g, ''));
+        if (mode === 'item') return p.costco_item_number.includes(q);
+        return false;
+      })
+      .slice(0, 12);
+  }, [mode, query, products]);
+
+  const placeholder = MODES.find((m) => m.key === mode)?.placeholder ?? '';
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start"><IonBackButton defaultHref="/home" /></IonButtons>
-          <IonTitle>Search</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <div className="cs-page">
-          <header className="cs-header">
-            <span className="cs-header__eyebrow">Find</span>
-            <h2 className="cs-header__title">What are you looking for?</h2>
-            <p className="cs-header__sub">Name, brand, barcode, or Costco item number.</p>
-          </header>
+    <>
+      <OfflineBanner />
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '20px 16px 100px',
+          color: '#E5E7EB',
+        }}
+      >
+        <h1
+          style={{
+            margin: '0 0 12px',
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#F9FAFB',
+          }}
+        >
+          Search
+        </h1>
 
-          <label className="cs-field">
-            <span className="cs-field__label">Search</span>
+        {/* Sticky input */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            background: '#0B1220',
+            padding: '0 0 12px',
+            marginBottom: 12,
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: '#111827',
+              border: '1px solid #1F2937',
+              borderRadius: 12,
+              padding: '10px 14px',
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 18 }} aria-hidden>
+              🔍
+            </span>
             <input
-              className="cs-field__input"
               autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Name, brand, UPC, or Costco item #"
-              aria-label="Search products"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 0,
+                outline: 0,
+                color: '#E5E7EB',
+                fontSize: 15,
+                fontWeight: 500,
+              }}
             />
-          </label>
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                aria-label="Clear search"
+                style={{
+                  background: 'transparent',
+                  border: 0,
+                  color: '#9CA3AF',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
 
-          {error && <p role="alert" className="cs-error">{error}</p>}
-
-          {loading && (
-            <div className="cs-card cs-stack" aria-busy="true">
-              <div className="cs-skeleton" style={{ width: '60%' }} />
-              <div className="cs-skeleton" style={{ width: '40%' }} />
-            </div>
-          )}
-
-          {!loading && q.trim() && hits.length === 0 && (
-            <div className="cs-state">
-              <div className="cs-state__icon" aria-hidden>∅</div>
-              <h3 className="cs-state__title">No matches</h3>
-              <p className="cs-state__hint">
-                No matches for &ldquo;{q}&rdquo;. Try a Costco item number or a brand name.
-              </p>
-            </div>
-          )}
-
-          {!loading && hits.length > 0 && (
-            <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {hits.map((hit) => (
-                <li key={hit.productId}>
-                  <button
-                    type="button"
-                    className="cs-card"
-                    style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                    onClick={() => history.push(`/product/${hit.productId}`)}
-                    aria-label={`Open ${hit.canonicalName}`}
-                  >
-                    <div className="cs-strong">{hit.canonicalName}</div>
-                    {hit.brand && <div className="cs-muted">{hit.brand}</div>}
-                    <div className="cs-muted" style={{ display: 'flex', gap: 'var(--cs-space-2)', flexWrap: 'wrap', marginTop: 'var(--cs-space-2)' }}>
-                      {hit.size && <span>{hit.size}</span>}
-                      {hit.category && <span className="cs-pill">{hit.category}</span>}
-                      {hit.identifier && (
-                        <span className="cs-pill" style={{ fontFamily: 'var(--cs-font-mono)' }}>
-                          {hit.identifierType}: {hit.identifier}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {!loading && !q.trim() && (
-            <div className="cs-state">
-              <div className="cs-state__icon" aria-hidden>⌕</div>
-              <h3 className="cs-state__title">Search by anything</h3>
-              <p className="cs-state__hint">Name, brand, barcode, or Costco item number.</p>
-            </div>
-          )}
+          {/* Mode tabs */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            {MODES.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => setMode(m.key)}
+                style={{
+                  background: mode === m.key ? '#34D399' : '#111827',
+                  color: mode === m.key ? '#0B1220' : '#E5E7EB',
+                  border: 0,
+                  borderRadius: 999,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </IonContent>
-    </IonPage>
+
+        {/* Results */}
+        {query.trim() === '' ? (
+          <EmptyState
+            icon="🔎"
+            title="Search the catalog"
+            body={`${products.length} products in your area — try a barcode, item number, or brand.`}
+          />
+        ) : results.length === 0 ? (
+          <EmptyState
+            icon="🤷"
+            title="No matches"
+            body={`Nothing matches "${query}" in this mode. Try switching tabs.`}
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {results.map((p) => {
+              const obs = observations
+                .filter((o) => o.product_id === p.id && o.warehouse_id === warehouse?.id)
+                .sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))[0];
+              return (
+                <Card
+                  key={p.id}
+                  padding={12}
+                  onClick={() => history.push(`/product/${p.id}`)}
+                  style={{ display: 'flex', gap: 12, alignItems: 'center' }}
+                >
+                  <ProductImage product={p} size={48} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#F9FAFB',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {p.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                      #{p.costco_item_number} · {p.size}
+                    </div>
+                  </div>
+                  {obs && (
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: obs.markdown_class === 'none' ? '#E5E7EB' : '#34D399',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      ${(obs.price_cents / 100).toFixed(2)}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
