@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { IonLoading } from '@ionic/react';
+import { IonContent, IonPage } from '@ionic/react';
 import { isSupabaseConfigured, supabase } from '@services/supabase/client';
 import { AuthScreen } from './AuthScreen';
 import { DemoScreen } from './DemoScreen';
@@ -49,7 +49,19 @@ export function AuthGate({ children }: AuthGateProps): JSX.Element {
     return <DemoScreen />;
   }
   if (state === 'loading') {
-    return <IonLoading isOpen message="Signing you in..." />;
+    return (
+      <IonPage>
+        <IonContent fullscreen>
+          <div className="cs-auth" role="status" aria-live="polite">
+            <div className="cs-auth__panel">
+              <p className="cs-meta cs-auth__eyebrow">COSTCO-SAVER</p>
+              <h1 className="cs-section-title">Checking your session…</h1>
+              <p className="cs-muted">Hang tight while we confirm you are signed in.</p>
+            </div>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
   }
   if (state === 'out') {
     return <AuthScreen onSignedIn={() => setState('in')} />;

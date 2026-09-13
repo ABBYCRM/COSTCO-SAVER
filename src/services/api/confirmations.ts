@@ -23,10 +23,25 @@ export async function confirmObservation(
   });
   if (error) throw error;
 
-  // The SQL function returns the confirmation id; we don't currently
-  // surface consensusMatches separately (the function bumps the counter
-  // atomically only on match).
-  return { confirmationId: data as string, consensusMatches: true };
+  const { data: obs } = await supabase()
+    .from('price_observations')
+    .select('product_id, warehouse_id')
+    .eq('id', observationId)
+    .maybeSingle();
+  let consensusMatches = false;
+  if (obs) {
+    const row = obs as { product_id: string; warehouse_id: string };
+    const { data: state } = await supabase()
+      .from('warehouse_product_state')
+      .select('consensus_price_cents')
+      .eq('product_id', row.product_id)
+      .eq('warehouse_id', row.warehouse_id)
+      .maybeSingle();
+    consensusMatches =
+      (state as { consensus_price_cents: number | null } | null)?.consensus_price_cents ===
+      confirmedPriceCents;
+  }
+  return { confirmationId: data as string, consensusMatches };
 }
 
 function hexToBytes(hex: string): Uint8Array {

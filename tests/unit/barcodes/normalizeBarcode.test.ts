@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeCheckDigit,
+  expandUpcEtoUpcA,
   isValidEan13,
   isValidEan8,
   isValidGtin14,
@@ -70,6 +71,39 @@ describe('barcode / normalizeBarcode', () => {
     expect(n.kind).toBe('UNKNOWN');
     expect(n.value).toBe('1234567');
     expect(n.checkDigitValid).toBe(false);
+  });
+
+  it('expands UPC-E with last digit 0/1/2 using the GS1 table', () => {
+    const expanded = expandUpcEtoUpcA('123450');
+    expect(expanded).not.toBeNull();
+    expect(expanded).toHaveLength(12);
+    expect(isValidUpcA(expanded!)).toBe(true);
+    expect(expanded!.startsWith('01200000345')).toBe(true);
+  });
+
+  it('expands UPC-E last=3 / last=4 / last=5-9', () => {
+    const e3 = expandUpcEtoUpcA('123453');
+    expect(e3).toHaveLength(12);
+    expect(isValidUpcA(e3!)).toBe(true);
+    expect(e3!.startsWith('01230000045')).toBe(true);
+
+    const e4 = expandUpcEtoUpcA('123454');
+    expect(e4).toHaveLength(12);
+    expect(isValidUpcA(e4!)).toBe(true);
+    expect(e4!.startsWith('01234000005')).toBe(true);
+
+    const e9 = expandUpcEtoUpcA('123459');
+    expect(e9).toHaveLength(12);
+    expect(isValidUpcA(e9!)).toBe(true);
+    expect(e9!.startsWith('01234500009')).toBe(true);
+  });
+
+  it('normalizes a 6-digit UPC-E to EAN-13', () => {
+    const n = normalizeBarcode('123450');
+    expect(n.kind).toBe('UPC_E');
+    expect(n.checkDigitValid).toBe(true);
+    expect(n.value).toHaveLength(13);
+    expect(n.value.startsWith('0')).toBe(true);
   });
 
   it('strips spaces and dashes from the input', () => {

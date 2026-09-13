@@ -100,38 +100,50 @@ export function CoverageCard({ warehouseId }: CoverageCardProps): JSX.Element {
   if (loading) {
     return (
       <section className="cs-card" aria-busy="true">
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage</h3>
+        <p className="cs-meta">Coverage</p>
+        <h3 className="cs-strong" style={{ margin: 'var(--cs-space-1) 0 0' }}>Coverage radar</h3>
         <p className="cs-muted">Calculating…</p>
+        <div className="cs-progress" style={{ marginTop: 'var(--cs-space-3)' }}>
+          <span className="cs-progress__fill" style={{ width: '18%' }} />
+        </div>
       </section>
     );
   }
   if (error) {
     return (
       <section className="cs-card">
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage</h3>
-        <p className="cs-muted">{error}</p>
+        <p className="cs-meta">Coverage</p>
+        <h3 className="cs-strong" style={{ margin: 'var(--cs-space-1) 0 0' }}>Coverage radar</h3>
+        <p className="cs-error">{error}</p>
       </section>
     );
   }
   const result = computeWarehouseHealth(stats);
   const labelClass = labelToClass(result.label);
+  const fill = Math.max(0, Math.min(100, result.score));
   return (
     <section className="cs-card" aria-label={`Warehouse coverage ${result.label}`}>
       <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-        <h3 className="cs-strong" style={{ margin: 0 }}>Coverage radar</h3>
+        <div>
+          <p className="cs-meta" style={{ margin: 0 }}>Coverage</p>
+          <h3 className="cs-strong" style={{ margin: 'var(--cs-space-1) 0 0' }}>Coverage radar</h3>
+        </div>
         <span className={`cs-pill cs-pill--${labelClass}`}>{result.label}</span>
+      </div>
+      <div className="cs-progress" style={{ marginTop: 'var(--cs-space-3)' }} aria-valuenow={fill} aria-valuemin={0} aria-valuemax={100} role="progressbar">
+        <span className="cs-progress__fill" style={{ width: `${fill}%` }} />
       </div>
       <div className="cs-row" style={{ justifyContent: 'space-between', marginTop: 'var(--cs-space-3)' }}>
         <div>
-          <div className="cs-muted">Health score</div>
+          <div className="cs-meta">Health score</div>
           <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>{result.score}/100</div>
         </div>
         <div>
-          <div className="cs-muted">Products</div>
+          <div className="cs-meta">Products</div>
           <div className="cs-strong">{stats.activeObservedProducts}</div>
         </div>
         <div>
-          <div className="cs-muted">Median age</div>
+          <div className="cs-meta">Median age</div>
           <div className="cs-strong">{stats.medianObservationAgeHours.toFixed(1)}h</div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { IonButton, IonContent, IonInput, IonItem, IonLabel, IonPage } from '@ionic/react';
+import { IonContent, IonPage } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 
 interface AuthScreenProps {
@@ -46,44 +46,48 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps): JSX.Element {
   return (
     <IonPage>
       <IonContent fullscreen>
-        <div className="cs-page" style={{ paddingTop: 'var(--cs-space-7)' }}>
-          <h1 className="cs-section-title">COSTCO-SAVER</h1>
-          <p className="cs-muted">Scan it before you buy it.</p>
-          <form onSubmit={submit} className="cs-stack" style={{ marginTop: 'var(--cs-space-5)' }}>
-            <IonItem>
-              <IonLabel position="stacked">Email</IonLabel>
-              <IonInput
-                type="email"
-                autocomplete="email"
-                value={email}
-                onIonChange={(e) => setEmail(e.detail.value ?? '')}
-                required
-              />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Password</IonLabel>
-              <IonInput
-                type="password"
-                autocomplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                value={password}
-                minlength={8}
-                onIonChange={(e) => setPassword(e.detail.value ?? '')}
-                required
-              />
-            </IonItem>
-            {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-            <IonButton type="submit" expand="block" disabled={busy}>
-              {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
-            </IonButton>
-            <IonButton
-              type="button"
-              expand="block"
-              fill="clear"
-              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-            >
-              {mode === 'signin' ? 'Need an account? Create one' : 'Have an account? Sign in'}
-            </IonButton>
-          </form>
+        <div className="cs-auth">
+          <div className="cs-auth__panel">
+            <p className="cs-meta cs-auth__eyebrow">Scan it before you buy it</p>
+            <h1 className="cs-section-title">COSTCO-SAVER</h1>
+            <p className="cs-muted">Warehouse price intelligence. Verify the shelf, then decide.</p>
+            <form onSubmit={submit} className="cs-stack" style={{ marginTop: 'var(--cs-space-5)' }}>
+              <label className="cs-field">
+                <span className="cs-field__label">Email</span>
+                <input
+                  className="cs-field__input"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="cs-field">
+                <span className="cs-field__label">Password</span>
+                <input
+                  className="cs-field__input"
+                  type="password"
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  value={password}
+                  minLength={8}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </label>
+              {error && <p className="cs-error" role="alert">{error}</p>}
+              <button className="cs-button" type="submit" disabled={busy}>
+                {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              </button>
+              <button
+                className="cs-button cs-button--ghost"
+                type="button"
+                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+              >
+                {mode === 'signin' ? 'Need an account? Create one' : 'Have an account? Sign in'}
+              </button>
+            </form>
+          </div>
         </div>
       </IonContent>
     </IonPage>

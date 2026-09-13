@@ -56,3 +56,12 @@ export function supabase(): SupabaseClient {
 export function supabaseUrl(): string {
   return url;
 }
+
+/** Authenticated user id, or throw. Used by every private insert. */
+export async function requireUserId(): Promise<string> {
+  const { data, error } = await supabase().auth.getUser();
+  if (error) throw error;
+  const id = data.user?.id;
+  if (!id) throw new Error('Not authenticated');
+  return id;
+}

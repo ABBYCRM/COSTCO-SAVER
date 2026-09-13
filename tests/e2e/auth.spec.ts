@@ -17,6 +17,7 @@ test('user can sign up and reach the home tab', async ({ page }) => {
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@costco-saver.test`;
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('Costco-saver-test-123!');
+  await page.getByRole('button', { name: 'Need an account? Create one' }).click();
   await page.getByRole('button', { name: 'Create account' }).click();
 
   // Home renders the warehouse picker prompt.

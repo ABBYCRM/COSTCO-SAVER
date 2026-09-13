@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonChip, IonLabel } from '@ionic/react';
+import { useHistory } from 'react-router';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonChip, IonLabel, IonButtons, IonMenuButton } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
 import { formatUSD, cents } from '@domain/money/cents';
@@ -33,11 +34,13 @@ interface DealResponse {
 }
 
 export function DealsPage(): JSX.Element {
+  const history = useHistory();
   const { selected } = useWarehouse();
   const [deals, setDeals] = useState<DealRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'clearance' | 'manager_markdown' | 'asterisk'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [asteriskProductIds, setAsteriskProductIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!selected) return;
@@ -75,6 +78,15 @@ export function DealsPage(): JSX.Element {
         setDeals(rows);
         setLoading(false);
       });
+    supabase()
+      .from('price_observations')
+      .select('product_id')
+      .eq('warehouse_id', selected.id)
+      .eq('has_asterisk', true)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setAsteriskProductIds(new Set((data ?? []).map((r: { product_id: string }) => r.product_id)));
+      });
     return () => {
       cancelled = true;
     };
@@ -95,6 +107,7 @@ export function DealsPage(): JSX.Element {
     if (filter === 'all') return true;
     if (filter === 'clearance') return d.markdown_class === 'clearance';
     if (filter === 'manager_markdown') return d.markdown_class === 'manager_markdown';
+    if (filter === 'asterisk') return asteriskProductIds.has(d.product_id);
     return true;
   });
 
@@ -102,6 +115,7 @@ export function DealsPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Deals · {selected.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -117,6 +131,9 @@ export function DealsPage(): JSX.Element {
             <IonChip onClick={() => setFilter('manager_markdown')} color={filter === 'manager_markdown' ? 'primary' : undefined}>
               <IonLabel>Manager markdown</IonLabel>
             </IonChip>
+            <IonChip onClick={() => setFilter('asterisk')} color={filter === 'asterisk' ? 'primary' : undefined}>
+              <IonLabel>Asterisk *</IonLabel>
+            </IonChip>
           </div>
 
           {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
@@ -130,7 +147,7 @@ export function DealsPage(): JSX.Element {
             <div className="cs-empty">
               <p>No verified prices at this warehouse yet.</p>
               <p className="cs-muted">Be the first shopper to submit a verified shelf price.</p>
-              <button className="cs-button" onClick={() => location.assign('/scan')}>Scan a shelf</button>
+              <button className="cs-button" onClick={() => history.push('/scan')}>Scan a shelf</button>
             </div>
           )}
           <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -143,7 +160,12 @@ export function DealsPage(): JSX.Element {
                 currentWarehousePrice: d.consensus_price_cents ?? 0,
               });
               return (
-                <li key={d.product_id} className="cs-card">
+                <li key={d.product_id}>
+                  <button
+                    className="cs-card"
+                    style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
+                    onClick={() => history.push(`/product/${d.product_id}`)}
+                  >
                   <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                     <div>
                       <div className="cs-strong">{d.product_name}</div>
@@ -159,6 +181,7 @@ export function DealsPage(): JSX.Element {
                       <div className="cs-muted">{score.rating} · {score.score}</div>
                     </div>
                   </div>
+                  </button>
                 </li>
               );
             })}

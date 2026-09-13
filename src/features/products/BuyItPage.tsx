@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonBackButton, IonButtons, IonInput, IonItem, IonLabel } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonBackButton, IonButtons } from '@ionic/react';
 import { useWarehouse } from '@stores/warehouse';
 import { createPurchase } from '@services/api/purchases';
 import { cents, formatUSD, fromMajorUnits } from '@domain/money/cents';
@@ -82,35 +82,51 @@ export function BuyItPage(): JSX.Element {
       </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
-          <p className="cs-muted">
-            Recording at <span className="cs-strong">{selected?.name ?? 'no warehouse'}</span>.
-            You can adjust the price you actually paid below.
-          </p>
-          <IonItem>
-            <IonLabel position="stacked">Price you paid (USD)</IonLabel>
-            <IonInput
+          <header className="cs-header">
+            <h1 className="cs-header__title">Record purchase</h1>
+            <p className="cs-header__sub">
+              Recording at <span className="cs-strong">{selected?.name ?? 'no warehouse'}</span>.
+              You can adjust the price you actually paid below.
+            </p>
+          </header>
+
+          <label className="cs-field">
+            <span className="cs-field__label">Price you paid (USD)</span>
+            <input
+              className="cs-field__input"
               inputMode="decimal"
               value={unitPrice}
-              onIonChange={(e) => setUnitPrice(e.detail.value ?? '')}
+              onChange={(e) => setUnitPrice(e.target.value)}
               placeholder="e.g. 19.97"
             />
-          </IonItem>
-          <IonItem>
-            <IonLabel position="stacked">Quantity</IonLabel>
-            <IonInput
+          </label>
+          <label className="cs-field">
+            <span className="cs-field__label">Quantity</span>
+            <input
+              className="cs-field__input"
               inputMode="numeric"
               value={quantity}
-              onIonChange={(e) => setQuantity(e.detail.value ?? '')}
+              onChange={(e) => setQuantity(e.target.value)}
             />
-          </IonItem>
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
-          {success && <p className="cs-strong" role="status">{success}</p>}
-          <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={submit} disabled={busy || !unitPrice || !selected}>
+          </label>
+
+          {error && <p className="cs-error" role="alert">{error}</p>}
+          {success && <p className="cs-success" role="status">{success}</p>}
+
+          <div className="cs-actions">
+            <button
+              className="cs-button"
+              type="button"
+              onClick={submit}
+              disabled={busy || !unitPrice || !selected}
+            >
               {busy ? 'Saving…' : 'Save purchase'}
-            </IonButton>
-            <IonButton fill="outline" onClick={() => history.goBack()}>Cancel</IonButton>
+            </button>
+            <button className="cs-button cs-button--ghost" type="button" onClick={() => history.goBack()}>
+              Cancel
+            </button>
           </div>
+
           {existing?.consensus_price_cents != null && (
             <p className="cs-muted" style={{ marginTop: 'var(--cs-space-3)' }}>
               Current verified price at this warehouse: {formatUSD(cents(existing.consensus_price_cents))}

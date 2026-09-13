@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonItem, IonLabel, IonCheckbox, IonNote } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonInput, IonItem, IonLabel, IonCheckbox, IonNote, IonButtons, IonMenuButton } from '@ionic/react';
 import { useHistory } from 'react-router';
-import { supabase } from '@services/supabase/client';
+import { requireUserId, supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
 import { normalizeBarcode, type BarcodeKind } from '@domain/barcodes/normalizeBarcode';
 import { classifyPriceCode } from '@domain/pricing/priceCodeEngine';
 import { cents, fromMajorUnits, formatUSD } from '@domain/money/cents';
+import { submitShelfObservation } from '@services/api/observations';
 
 type ScanMode = 'barcode' | 'shelf_tag';
 
@@ -78,6 +79,17 @@ export function ScanPage(): JSX.Element {
     const product = (data as { products: { id: string } | { id: string }[] | null } | null)?.products;
     const productId = Array.isArray(product) ? product[0]?.id : product?.id;
     if (productId) {
+      try {
+        const userId = await requireUserId();
+        await supabase().from('scan_history').insert({
+          user_id: userId,
+          product_id: productId,
+          barcode_normalized: normalized.value,
+          warehouse_id: selected?.id ?? null,
+        });
+      } catch {
+        // History is best-effort; lookup still succeeds.
+      }
       history.push(`/product/${productId}`);
     } else {
       setManualBarcode(content);
@@ -99,8 +111,46 @@ export function ScanPage(): JSX.Element {
     setError(null);
     try {
       const priceCents = fromMajorUnits(priceMajor);
+      let productId: string | null = null;
+      const item = manualItemNumber.trim();
+      if (item) {
+        const { data, error: idErr } = await supabase()
+          .from('product_identifiers')
+          .select('product_id')
+          .eq('identifier_type', 'COSTCO_ITEM_NUMBER')
+          .eq('normalized_value', item)
+          .maybeSingle();
+        if (idErr) throw idErr;
+        productId = (data as { product_id: string } | null)?.product_id ?? null;
+      }
+      if (!productId && manualBarcode.trim()) {
+        const normalized = normalizeBarcode(manualBarcode);
+        if (normalized.value) {
+          const { data } = await supabase()
+            .from('product_identifiers')
+            .select('product_id')
+            .eq('normalized_value', normalized.value)
+            .limit(1)
+            .maybeSingle();
+          productId = (data as { product_id: string } | null)?.product_id ?? null;
+        }
+      }
+      if (!productId) {
+        setError(
+          'Unknown product. Scan or look up the barcode first, or enter a Costco item number already in the catalog.',
+        );
+        return;
+      }
+      await submitShelfObservation({
+        productId,
+        warehouseId: selected.id,
+        priceCents: priceCents as number,
+        hasAsterisk,
+        idempotencyKey: crypto.randomUUID(),
+      });
       const classification = classifyPriceCode({ priceCents, hasAsterisk });
       setLastResult(`Submitted: ${formatUSD(priceCents)} (${classification.classification})`);
+      history.push(`/product/${productId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit observation');
     } finally {
@@ -112,6 +162,7 @@ export function ScanPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Scan</IonTitle>
         </IonToolbar>
       </IonHeader>

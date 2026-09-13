@@ -18,18 +18,22 @@ export async function searchProducts(query: string, limit = 20): Promise<SearchH
   const trimmed = query.trim();
   if (!trimmed) return [];
 
+  // Strip PostgREST filter metacharacters so user input cannot widen `.or()`.
+  const needle = trimmed.replace(/[%_\\,().]/g, '').slice(0, 80);
+  if (!needle) return [];
+
   // Two-step: look up by identifier first, then by trigram name match.
   const { data: idHits, error: idErr } = await supabase()
     .from('product_identifiers')
     .select('product_id, identifier_type, normalized_value, products(canonical_name, brand, size_value, size_unit, categories(slug))')
-    .or(`normalized_value.ilike.%${trimmed}%`)
+    .ilike('normalized_value', `%${needle}%`)
     .limit(limit);
   if (idErr) throw idErr;
 
   const { data: nameHits, error: nameErr } = await supabase()
     .from('products')
     .select('id, canonical_name, brand, size_value, size_unit, categories(slug)')
-    .or(`canonical_name.ilike.%${trimmed}%,brand.ilike.%${trimmed}%`)
+    .or(`canonical_name.ilike.%${needle}%,brand.ilike.%${needle}%`)
     .limit(limit);
   if (nameErr) throw nameErr;
 

@@ -13,8 +13,10 @@ cd "$REPO_ROOT"
 BRANCH="dist"
 WORKTREE_DIR="$(mktemp -d -t costco-dist-XXXXXX)"
 
-echo "[1/5] vite build"
-npx vite build
+echo "[1/5] vite build (project base /COSTCO-SAVER/ so assets resolve on GH Pages)"
+# Do not change vite.config.ts manualChunks — that is the working TDZ fix.
+# --base is required: default `/assets/…` 404s at github.io root.
+npx vite build --base /COSTCO-SAVER/
 
 echo "[2/5] creating worktree at $WORKTREE_DIR"
 git worktree add -B "$BRANCH" "$WORKTREE_DIR" 2026-08-31/feature/phase-0-bootstrap
