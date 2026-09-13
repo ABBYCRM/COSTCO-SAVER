@@ -13,8 +13,13 @@ cd "$REPO_ROOT"
 BRANCH="dist"
 WORKTREE_DIR="$(mktemp -d -t costco-dist-XXXXXX)"
 
-echo "[1/5] vite build"
-npx vite build
+# GitHub Pages serves this repo at https://<org>.github.io/COSTCO-SAVER/.
+# Vite needs to know that prefix or the bundle's asset URLs (default
+# "/assets/...") 404 against the GH Pages origin. Override with --base.
+GH_PAGES_BASE="${GH_PAGES_BASE:-/COSTCO-SAVER/}"
+
+echo "[1/5] vite build (base=$GH_PAGES_BASE)"
+npx vite build --base "$GH_PAGES_BASE"
 
 echo "[2/5] creating worktree at $WORKTREE_DIR"
 git worktree add -B "$BRANCH" "$WORKTREE_DIR" 2026-08-31/feature/phase-0-bootstrap
