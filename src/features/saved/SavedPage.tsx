@@ -1,237 +1,306 @@
-import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSegment, IonSegmentButton, IonLabel, IonButton, IonButtons, IonMenuButton } from '@ionic/react';
-import { useHistory } from 'react-router';
-import { useWarehouse } from '@stores/warehouse';
-import { listWatches, type WatchRow } from '@services/api/watches';
-import { listPurchases, type PurchaseRow } from '@services/api/purchases';
-import { listAdjustments, setAdjustmentStatus, type AdjustmentRow } from '@services/api/adjustments';
-import { supabase } from '@services/supabase/client';
-import { formatUSD, cents } from '@domain/money/cents';
+/**
+ * SavedPage — Watching / Purchased / Receipts tabs.
+ */
 
-type Section = 'watching' | 'purchases' | 'adjustments' | 'deals';
+import { useState } from 'react';
+import { useHistory } from 'react-router';
+import { useApp } from '@data/store';
+import { formatCents } from '@data/selectors';
+import { Card, EmptyState, OfflineBanner, Pill, Price, Section } from '@components/UI';
+import { ProductImage } from '@components/ProductImage';
+
+type Tab = 'watching' | 'purchased' | 'receipts';
+
+const TABS: Array<{ key: Tab; label: string }> = [
+  { key: 'watching', label: 'Watching' },
+  { key: 'purchased', label: 'Purchased' },
+  { key: 'receipts', label: 'Receipts' },
+];
 
 export function SavedPage(): JSX.Element {
   const history = useHistory();
-  const { selected } = useWarehouse();
-  const [section, setSection] = useState<Section>('watching');
-  const [watches, setWatches] = useState<WatchRow[]>([]);
-  const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
-  const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([]);
-  const [purchaseProducts, setPurchaseProducts] = useState<Record<string, string>>({});
-  const [watchProducts, setWatchProducts] = useState<Record<string, string>>({});
-  const [purchaseWarehouses, setPurchaseWarehouses] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([listWatches(), listPurchases(), listAdjustments()])
-      .then(async ([w, p, a]) => {
-        if (cancelled) return;
-        setWatches(w);
-        setPurchases(p);
-        setAdjustments(a);
-        // Fetch related product and warehouse names for purchases.
-        const productIds = Array.from(new Set([...p.map((x) => x.product_id), ...w.map((x) => x.product_id)]));
-        const warehouseIds = Array.from(new Set(p.map((x) => x.warehouse_id)));
-        if (productIds.length) {
-          const { data: prods } = await supabase()
-            .from('products')
-            .select('id, canonical_name')
-            .in('id', productIds);
-          if (!cancelled) {
-            const map: Record<string, string> = {};
-            for (const r of (prods ?? []) as { id: string; canonical_name: string }[]) {
-              map[r.id] = r.canonical_name;
-            }
-            setPurchaseProducts(map);
-            const watchMap: Record<string, string> = {};
-            for (const r of (prods ?? []) as { id: string; canonical_name: string }[]) {
-              watchMap[r.id] = r.canonical_name;
-            }
-            setWatchProducts(watchMap);
-          }
-        }
-        if (warehouseIds.length) {
-          const { data: whs } = await supabase()
-            .from('warehouses')
-            .select('id, name')
-            .in('id', warehouseIds);
-          if (!cancelled) {
-            const map: Record<string, string> = {};
-            for (const r of (whs ?? []) as { id: string; name: string }[]) {
-              map[r.id] = r.name;
-            }
-            setPurchaseWarehouses(map);
-          }
-        }
-        setLoading(false);
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setError(err.message);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function markAdjustment(id: string, status: AdjustmentRow['status']) {
-    setError(null);
-    try {
-      await setAdjustmentStatus(id, status);
-      const next = adjustments.map((a) => (a.id === id ? { ...a, status } : a));
-      setAdjustments(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update adjustment');
-    }
-  }
-
-  const adjustmentOpportunities = adjustments.filter(
-    (a) => a.status === 'opportunity' && (selected == null || a.warehouse_id === selected.id),
-  );
+  const products = useApp((s) => s.products);
+  const watches = useApp((s) => s.watches);
+  const receipts = useApp((s) => s.receipts);
+  const warehouses = useApp((s) => s.warehouses);
+  const removeWatch = useApp((s) => s.removeWatch);
+  const [tab, setTab] = useState<Tab>('watching');
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Saved</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <div className="cs-page">
-          <IonSegment value={section} onIonChange={(e) => setSection(e.detail.value as Section)}>
-            <IonSegmentButton value="watching"><IonLabel>Watching</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="purchases"><IonLabel>Purchases</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="adjustments"><IonLabel>Adjustments</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="deals"><IonLabel>Saved deals</IonLabel></IonSegmentButton>
-          </IonSegment>
+    <>
+      <OfflineBanner />
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '20px 16px 100px',
+          color: '#E5E7EB',
+        }}
+      >
+        <h1
+          style={{
+            margin: '0 0 12px',
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#F9FAFB',
+          }}
+        >
+          Saved
+        </h1>
 
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+        {/* Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            background: '#111827',
+            borderRadius: 12,
+            padding: 4,
+            marginBottom: 16,
+          }}
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                flex: 1,
+                background: tab === t.key ? '#34D399' : 'transparent',
+                color: tab === t.key ? '#0B1220' : '#E5E7EB',
+                border: 0,
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {loading && <div className="cs-card cs-stack" aria-busy="true"><div className="cs-skeleton" style={{ width: '60%' }} /></div>}
-
-          {!loading && section === 'watching' && (
-            <>
-              {watches.length === 0 ? (
-                <div className="cs-empty">
-                  <p>You are not watching any products.</p>
-                  <p className="cs-muted">Open a product and tap Watch to get notified when its verified price changes.</p>
-                  <IonButton onClick={() => history.push('/home')}>Go to Home</IonButton>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {watches.map((w) => (
-                    <li key={w.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="cs-strong">{watchProducts[w.product_id] ?? 'Watch'}</div>
-                          {w.target_price_cents != null && (
-                            <div className="cs-muted">Target: {formatUSD(cents(w.target_price_cents))}</div>
+        {tab === 'watching' && (
+          <>
+            {watches.length === 0 ? (
+              <EmptyState
+                icon="👁️"
+                title="Nothing on watch"
+                body="Tap a product, hit 'Watch price', and we'll alert you when it drops."
+                cta={{ label: 'Browse products', onClick: () => history.push('/deals') }}
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {watches.map((w) => {
+                  const product = products.find((p) => p.id === w.product_id);
+                  if (!product) return null;
+                  const delta = w.current_cents - w.target_cents;
+                  const hit = delta <= 0;
+                  return (
+                    <Card
+                      key={w.id}
+                      padding={12}
+                      onClick={() => history.push(`/product/${product.id}`)}
+                      style={{ display: 'flex', gap: 12, alignItems: 'center' }}
+                    >
+                      <ProductImage product={product} size={56} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: '#F9FAFB',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {product.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                          Target {formatCents(w.target_cents)} · Now{' '}
+                          {formatCents(w.current_cents)}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: 'flex',
+                            gap: 6,
+                            alignItems: 'center',
+                          }}
+                        >
+                          {hit ? (
+                            <Pill color="#34D399" bg="#34D39920">
+                              ✓ hit
+                            </Pill>
+                          ) : (
+                            <Pill color="#FBBF24" bg="#FBBF2420">
+                              {formatCents(Math.abs(delta))} to go
+                            </Pill>
                           )}
                         </div>
-                        <div>
-                          {w.notify_any_drop && <span className="cs-pill">any drop</span>}
-                          {w.notify_clearance && <span className="cs-pill cs-pill--clearance">.97</span>}
-                          {w.notify_manager_markdown && <span className="cs-pill cs-pill--aging">manager</span>}
-                        </div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeWatch(w.id);
+                        }}
+                        aria-label="Remove watch"
+                        style={{
+                          background: 'transparent',
+                          border: 0,
+                          color: '#6B7280',
+                          fontSize: 20,
+                          cursor: 'pointer',
+                          padding: 4,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
-          {!loading && section === 'purchases' && (
-            <>
-              {purchases.length === 0 ? (
-                <div className="cs-empty">
-                  <p>No purchases recorded yet.</p>
-                  <p className="cs-muted">You can record a purchase from any product detail page.</p>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {purchases.map((p) => (
-                    <li key={p.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
+        {tab === 'purchased' && (
+          <>
+            {receipts.length === 0 ? (
+              <EmptyState
+                icon="🧾"
+                title="No purchases yet"
+                body="Mark items as purchased to track your spending and find adjustment opportunities."
+                cta={{ label: 'Find a deal', onClick: () => history.push('/deals') }}
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {receipts.map((r) => {
+                  const w = warehouses.find((x) => x.id === r.warehouse_id);
+                  return (
+                    <Card key={r.id} padding={14}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          marginBottom: 8,
+                        }}
+                      >
                         <div>
-                          <div className="cs-strong">{purchaseProducts[p.product_id] ?? 'Product'}</div>
-                          <div className="cs-muted">
-                            {purchaseWarehouses[p.warehouse_id] ?? 'Warehouse'} · {new Date(p.purchase_date).toLocaleDateString()}
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#F9FAFB' }}>
+                            {w?.city}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                            {new Date(r.purchased_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}{' '}
+                            · {r.items.length} item{r.items.length === 1 ? '' : 's'}
                           </div>
                         </div>
-                        <div className="cs-price cs-strong">
-                          {formatUSD(cents(p.total_cents))}
-                        </div>
+                        <Price cents={r.total_cents} size="lg" />
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-
-          {!loading && section === 'adjustments' && (
-            <>
-              {adjustmentOpportunities.length === 0 ? (
-                <div className="cs-empty">
-                  <p>No adjustment opportunities right now.</p>
-                  <p className="cs-muted">If a price drops within 30 days of your purchase, we will surface it here.</p>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {adjustmentOpportunities.map((a) => (
-                    <li key={a.id} className="cs-card">
-                      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="cs-strong">You may be able to recover {formatUSD(cents(a.potential_savings_cents))}</div>
-                          <div className="cs-muted">{a.days_remaining} days remaining · status: {a.status}</div>
-                        </div>
-                        <div>
-                          <IonButton size="small" onClick={() => markAdjustment(a.id, 'claimed')}>Mark Claimed</IonButton>
-                          <IonButton size="small" fill="outline" onClick={() => markAdjustment(a.id, 'dismissed')}>Dismiss</IonButton>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-
-          {!loading && section === 'deals' && (
-            <>
-              {watches.length === 0 ? (
-                <div className="cs-empty">
-                  <p>You haven&apos;t saved any deals yet.</p>
-                  <p className="cs-muted">Open a product and tap Watch to save it here.</p>
-                </div>
-              ) : (
-                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {watches.map((w) => (
-                    <li key={`deal-${w.id}`}>
-                      <button
-                        className="cs-card"
-                        style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
-                        onClick={() => history.push(`/product/${w.product_id}`)}
-                      >
-                        <div className="cs-strong">{watchProducts[w.product_id] ?? 'Watched product'}</div>
-                        {w.target_price_cents != null && (
-                          <div className="cs-muted">Target: {formatUSD(cents(w.target_price_cents))}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {r.items.slice(0, 4).map((item, i) => {
+                          const p = products.find((p) => p.id === item.product_id);
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                display: 'flex',
+                                gap: 8,
+                                alignItems: 'center',
+                                padding: '4px 0',
+                              }}
+                            >
+                              {p && <ProductImage product={p} size={28} />}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    color: '#E5E7EB',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  {item.name}
+                                </div>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: '#9CA3AF',
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}
+                              >
+                                ${(item.unit_cents / 100).toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {r.items.length > 4 && (
+                          <div style={{ fontSize: 11, color: '#9CA3AF', paddingTop: 4 }}>
+                            + {r.items.length - 4} more item
+                            {r.items.length - 4 === 1 ? '' : 's'}
+                          </div>
                         )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
-      </IonContent>
-    </IonPage>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'receipts' && (
+          <>
+            <Section title="Original receipt photos">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {receipts.map((r) => (
+                  <Card key={r.id} padding={12}>
+                    <div
+                      style={{
+                        aspectRatio: '3 / 4',
+                        background:
+                          'repeating-linear-gradient(0deg, #1F2937 0px, #1F2937 24px, #111827 24px, #111827 48px)',
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        padding: 12,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        color: '#9CA3AF',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div style={{ color: '#34D399' }}>{r.thumbnail_label}</div>
+                      <div>{r.items.length} items</div>
+                      <div style={{ color: '#F9FAFB', fontWeight: 700 }}>
+                        ${(r.total_cents / 100).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                      {new Date(r.purchased_at).toLocaleDateString()}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Section>
+          </>
+        )}
+      </div>
+    </>
   );
 }

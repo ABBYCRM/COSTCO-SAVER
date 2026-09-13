@@ -32,6 +32,7 @@
       "@/*": ["src/*"],
       "@app/*": ["src/app/*"],
       "@components/*": ["src/components/*"],
+      "@data/*": ["src/data/*"],
       "@domain/*": ["src/domain/*"],
       "@features/*": ["src/features/*"],
       "@lib/*": ["src/lib/*"],
