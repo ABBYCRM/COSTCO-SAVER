@@ -157,3 +157,419 @@ img {
   border: 1px solid var(--cs-border-strong);
 }
 .cs-button.cs-button--ghost:hover { background: var(--cs-surface-elevated); }
+
+/* =================================================================
+ * COSTCO-SAVER — Auth screen (spec §49).
+ * Harmonizes with the design tokens. Dark surface, mint brand,
+ * mobile-first 44px touch targets, tabular inputs.
+ * ================================================================= */
+
+.cs-auth {
+  min-height: 100%;
+  padding: var(--cs-space-7) var(--cs-space-4);
+  background:
+    radial-gradient(1100px 600px at 12% -10%, rgba(94, 226, 164, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgba(106, 183, 255, 0.10), transparent 60%),
+    var(--cs-surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.cs-auth__brand {
+  margin-bottom: var(--cs-space-6);
+}
+
+.cs-auth__mark {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--cs-radius-2);
+  background: linear-gradient(135deg, var(--cs-brand) 0%, var(--cs-brand-deep) 100%);
+  color: var(--cs-text-on-brand);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 24px;
+  margin-bottom: var(--cs-space-4);
+  box-shadow: 0 6px 18px rgba(94, 226, 164, 0.25);
+}
+
+.cs-auth__title {
+  margin: 0;
+  font-size: var(--cs-font-size-6);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--cs-text-primary);
+}
+
+.cs-auth__lede {
+  margin: var(--cs-space-2) 0 0 0;
+  color: var(--cs-text-secondary);
+  font-size: var(--cs-font-size-3);
+}
+
+.cs-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-4);
+}
+
+.cs-auth__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+}
+
+.cs-auth__label {
+  font-size: var(--cs-font-size-2);
+  font-weight: 600;
+  color: var(--cs-text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cs-auth__input {
+  width: 100%;
+  min-height: var(--cs-touch-min);
+  padding: 0 var(--cs-space-4);
+  border-radius: var(--cs-radius-2);
+  background: var(--cs-surface-elevated);
+  border: 1px solid var(--cs-border);
+  color: var(--cs-text-primary);
+  font: inherit;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--cs-duration-1) var(--cs-easing-standard),
+              box-shadow var(--cs-duration-1) var(--cs-easing-standard);
+}
+
+.cs-auth__input:hover {
+  border-color: var(--cs-border-strong);
+}
+
+.cs-auth__input:focus {
+  outline: none;
+  border-color: var(--cs-brand);
+  box-shadow: 0 0 0 3px var(--cs-brand-soft);
+}
+
+.cs-auth__input::placeholder {
+  color: var(--cs-text-tertiary);
+}
+
+.cs-auth__error {
+  margin: 0;
+  padding: var(--cs-space-3) var(--cs-space-4);
+  background: rgba(255, 107, 107, 0.10);
+  border: 1px solid rgba(255, 107, 107, 0.32);
+  border-radius: var(--cs-radius-2);
+  color: var(--cs-danger);
+  font-size: var(--cs-font-size-2);
+}
+
+.cs-auth__submit {
+  width: 100%;
+  min-height: var(--cs-touch-min);
+  padding: 0 var(--cs-space-4);
+  border-radius: var(--cs-radius-2);
+  background: linear-gradient(135deg, var(--cs-brand) 0%, var(--cs-brand-deep) 100%);
+  color: var(--cs-text-on-brand);
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--cs-font-size-3);
+  border: 0;
+  cursor: pointer;
+  transition: transform var(--cs-duration-1) var(--cs-easing-standard),
+              filter var(--cs-duration-1) var(--cs-easing-standard);
+}
+
+.cs-auth__submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.cs-auth__submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cs-auth__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.cs-auth__toggle {
+  width: 100%;
+  min-height: var(--cs-touch-min);
+  background: transparent;
+  color: var(--cs-text-secondary);
+  border: 0;
+  padding: var(--cs-space-3) var(--cs-space-4);
+  font: inherit;
+  font-size: var(--cs-font-size-2);
+  border-radius: var(--cs-radius-2);
+  cursor: pointer;
+}
+
+.cs-auth__toggle:hover {
+  color: var(--cs-brand);
+  background: var(--cs-brand-soft);
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Empty / loading states harmonization.
+ * ================================================================= */
+
+.cs-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--cs-space-7) var(--cs-space-5);
+  color: var(--cs-text-secondary);
+  background: var(--cs-surface);
+  border: 1px dashed var(--cs-border);
+  border-radius: var(--cs-radius-3);
+  gap: var(--cs-space-3);
+}
+
+.cs-state__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-brand-soft);
+  color: var(--cs-brand);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  margin-bottom: var(--cs-space-2);
+}
+
+.cs-state__title {
+  margin: 0;
+  font-size: var(--cs-font-size-4);
+  font-weight: 600;
+  color: var(--cs-text-primary);
+}
+
+.cs-state__hint {
+  margin: 0;
+  font-size: var(--cs-font-size-2);
+  color: var(--cs-text-tertiary);
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Section header harmonization (used on every page).
+ * ================================================================= */
+
+.cs-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-1);
+  margin-bottom: var(--cs-space-4);
+}
+
+.cs-header__eyebrow {
+  font-size: var(--cs-font-size-1);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-brand);
+}
+
+.cs-header__title {
+  margin: 0;
+  font-size: var(--cs-font-size-6);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--cs-text-primary);
+  line-height: var(--cs-line-tight);
+}
+
+.cs-header__sub {
+  margin: 0;
+  color: var(--cs-text-secondary);
+  font-size: var(--cs-font-size-3);
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Segmented control harmonization.
+ * ================================================================= */
+
+.cs-segment {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-surface-elevated);
+  border: 1px solid var(--cs-border);
+  gap: 4px;
+  margin-bottom: var(--cs-space-4);
+}
+
+.cs-segment__item {
+  min-height: 36px;
+  padding: 0 var(--cs-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--cs-text-secondary);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--cs-font-size-2);
+  border-radius: var(--cs-radius-pill);
+  cursor: pointer;
+  transition: background var(--cs-duration-1) var(--cs-easing-standard),
+              color var(--cs-duration-1) var(--cs-easing-standard);
+}
+
+.cs-segment__item:hover {
+  color: var(--cs-text-primary);
+}
+
+.cs-segment__item[aria-pressed="true"] {
+  background: var(--cs-brand);
+  color: var(--cs-text-on-brand);
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Tab bar harmonization.
+ * Overrides Ionic's default tab bar to match the design system.
+ * ================================================================= */
+
+ion-tab-bar {
+  --background: var(--cs-surface-elevated);
+  --color: var(--cs-text-tertiary);
+  --color-selected: var(--cs-brand);
+  --border: 1px solid var(--cs-border);
+  border-top: 1px solid var(--cs-border);
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+ion-tab-button {
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  font-weight: 600;
+}
+
+ion-tab-button ion-label {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Inline field + inline error + success.
+ * Harmonized with the auth screen; used by every feature page.
+ * ================================================================= */
+
+.cs-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+}
+
+.cs-field--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--cs-touch-min);
+  padding: 0 var(--cs-space-3);
+  background: var(--cs-surface-elevated);
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-radius-2);
+  gap: var(--cs-space-3);
+}
+
+.cs-field--row .cs-field__label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--cs-font-size-3);
+  font-weight: 500;
+  color: var(--cs-text-primary);
+}
+
+.cs-field__label {
+  font-size: var(--cs-font-size-2);
+  font-weight: 600;
+  color: var(--cs-text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cs-field__input {
+  width: 100%;
+  min-height: var(--cs-touch-min);
+  padding: 0 var(--cs-space-4);
+  border-radius: var(--cs-radius-2);
+  background: var(--cs-surface-elevated);
+  border: 1px solid var(--cs-border);
+  color: var(--cs-text-primary);
+  font: inherit;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--cs-duration-1) var(--cs-easing-standard),
+              box-shadow var(--cs-duration-1) var(--cs-easing-standard);
+}
+
+.cs-field__input:hover { border-color: var(--cs-border-strong); }
+.cs-field__input:focus {
+  outline: none;
+  border-color: var(--cs-brand);
+  box-shadow: 0 0 0 3px var(--cs-brand-soft);
+}
+.cs-field__input::placeholder { color: var(--cs-text-tertiary); }
+
+.cs-field__checkbox {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--cs-brand);
+  cursor: pointer;
+}
+
+.cs-error {
+  margin: var(--cs-space-3) 0 0;
+  padding: var(--cs-space-3) var(--cs-space-4);
+  background: rgba(255, 107, 107, 0.10);
+  border: 1px solid rgba(255, 107, 107, 0.32);
+  border-radius: var(--cs-radius-2);
+  color: var(--cs-danger);
+  font-size: var(--cs-font-size-2);
+}
+
+.cs-success {
+  margin: var(--cs-space-3) 0 0;
+  padding: var(--cs-space-3) var(--cs-space-4);
+  background: var(--cs-brand-soft);
+  border: 1px solid rgba(94, 226, 164, 0.32);
+  border-radius: var(--cs-radius-2);
+  color: var(--cs-brand);
+  font-size: var(--cs-font-size-2);
+  font-weight: 600;
+}
+
+/* =================================================================
+ * COSTCO-SAVER — Header / toolbar harmonization.
+ * ================================================================= */
+
+ion-toolbar {
+  --background: var(--cs-surface);
+  --color: var(--cs-text-primary);
+  --border-color: var(--cs-border);
+  border-bottom: 1px solid var(--cs-border);
+}
+
+ion-title {
+  font-size: var(--cs-font-size-4);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--cs-text-primary);
+}
+
+ion-content {
+  --background: var(--cs-surface);
+  --color: var(--cs-text-primary);
+}
+
+ion-back-button,
+ion-menu-button {
+  --color: var(--cs-text-primary);
+}

@@ -9,7 +9,7 @@
  */
 
 import type { Cents } from '@domain/money/cents';
-import { cents, sumCents } from '@domain/money/cents';
+import { sumCents } from '@domain/money/cents';
 
 export interface TripListItem {
   productId: string;
@@ -102,6 +102,3 @@ export function rankWarehousesByTrip(
   });
   return out;
 }
-
-// Re-export so feature code can import from a single module if needed.
-export { cents };
