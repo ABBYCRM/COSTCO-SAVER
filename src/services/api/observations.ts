@@ -1,4 +1,5 @@
 import { supabase } from '@services/supabase/client';
+import { enqueueOutbox } from '@services/offline/outbox';
 
 export interface SubmitObservationInput {
   productId: string;
@@ -31,6 +32,15 @@ export interface SubmitObservationResult {
 export async function submitShelfObservation(
   input: SubmitObservationInput,
 ): Promise<SubmitObservationResult> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    enqueueOutbox({
+      kind: 'observation',
+      idempotencyKey: input.idempotencyKey,
+      payload: input as unknown as Record<string, unknown>,
+    });
+    return { observationId: `queued:${input.idempotencyKey}`, evidenceId: null };
+  }
+
   const { data: userRes, error: userErr } = await supabase().auth.getUser();
   if (userErr) throw userErr;
   const userId = userRes.user?.id;

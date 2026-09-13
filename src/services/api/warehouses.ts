@@ -24,15 +24,30 @@ export async function listWarehouses(): Promise<WarehouseRow[]> {
   return (data ?? []) as WarehouseRow[];
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const r = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
 export async function findNearbyWarehouses(
   latitude: number,
   longitude: number,
   limit = 10,
 ): Promise<WarehouseRow[]> {
-  // Use PostgREST to delegate the geo filter; ordering by haversine would
-  // need an RPC, so for Phase 0 we just return all verified warehouses.
-  void latitude;
-  void longitude;
-  void limit;
-  return listWarehouses();
+  const all = await listWarehouses();
+  return all
+    .filter((w) => w.latitude != null && w.longitude != null)
+    .map((w) => ({
+      w,
+      d: haversineKm(latitude, longitude, w.latitude as number, w.longitude as number),
+    }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, Math.max(1, limit))
+    .map((x) => x.w);
 }
