@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonRefresher, IonRefresherContent } from '@ionic/react';
+import { useHistory } from 'react-router';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonRefresher, IonRefresherContent, IonButtons, IonMenuButton } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { listWarehouses, type WarehouseRow } from '@services/api/warehouses';
 import { useWarehouse } from '@stores/warehouse';
@@ -32,6 +33,7 @@ interface DropRow {
 }
 
 export function HomePage(): JSX.Element {
+  const history = useHistory();
   const { selected, setSelected } = useWarehouse();
   const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
   const [drops, setDrops] = useState<DropRow[]>([]);
@@ -81,7 +83,7 @@ export function HomePage(): JSX.Element {
             new_price_cents: d.new_price_cents,
             effective_at: d.effective_at,
             markdown_class: null,
-            freshness_class: 'RECENT',
+            freshness_class: '',
           };
         });
         setDrops(rows);
@@ -115,7 +117,7 @@ export function HomePage(): JSX.Element {
           new_price_cents: d.new_price_cents,
           effective_at: d.effective_at,
           markdown_class: null,
-          freshness_class: 'RECENT',
+          freshness_class: '',
         };
       });
       setDrops(rows);
@@ -127,6 +129,7 @@ export function HomePage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>COSTCO-SAVER</IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -144,7 +147,7 @@ export function HomePage(): JSX.Element {
               <button className="cs-button cs-button--ghost" onClick={() => setShowPicker(true)}>
                 Switch warehouse
               </button>
-              <button className="cs-button" onClick={() => location.assign('/search')}>
+              <button className="cs-button" onClick={() => history.push('/search')}>
                 Search products
               </button>
             </div>
@@ -165,12 +168,17 @@ export function HomePage(): JSX.Element {
               <div className="cs-empty">
                 <p>No verified price drops at this warehouse yet.</p>
                 <p className="cs-muted">Be the first to scan a shelf and submit a verified price.</p>
-                <button className="cs-button" onClick={() => location.assign('/scan')}>Scan a shelf</button>
+                <button className="cs-button" onClick={() => history.push('/scan')}>Scan a shelf</button>
               </div>
             )}
             <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {drops.map((d) => (
-                <li key={`${d.product_id}-${d.effective_at}`} className="cs-card">
+                <li key={`${d.product_id}-${d.effective_at}`}>
+                  <button
+                    className="cs-card"
+                    style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
+                    onClick={() => history.push(`/product/${d.product_id}`)}
+                  >
                   <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                     <div>
                       <div className="cs-strong">{d.product_name}</div>
@@ -185,6 +193,7 @@ export function HomePage(): JSX.Element {
                       was {formatUSD(cents(d.old_price_cents))}
                     </div>
                   )}
+                  </button>
                 </li>
               ))}
             </ul>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonMenuButton } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 
 export function AccountPage(): JSX.Element {
@@ -30,6 +30,7 @@ export function AccountPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Account</IonTitle>
         </IonToolbar>
       </IonHeader>

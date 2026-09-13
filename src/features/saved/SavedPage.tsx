@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSegment, IonSegmentButton, IonLabel, IonButton } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSegment, IonSegmentButton, IonLabel, IonButton, IonButtons, IonMenuButton } from '@ionic/react';
+import { useHistory } from 'react-router';
 import { useWarehouse } from '@stores/warehouse';
 import { listWatches, type WatchRow } from '@services/api/watches';
 import { listPurchases, type PurchaseRow } from '@services/api/purchases';
@@ -10,12 +11,14 @@ import { formatUSD, cents } from '@domain/money/cents';
 type Section = 'watching' | 'purchases' | 'adjustments' | 'deals';
 
 export function SavedPage(): JSX.Element {
+  const history = useHistory();
   const { selected } = useWarehouse();
   const [section, setSection] = useState<Section>('watching');
   const [watches, setWatches] = useState<WatchRow[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([]);
   const [purchaseProducts, setPurchaseProducts] = useState<Record<string, string>>({});
+  const [watchProducts, setWatchProducts] = useState<Record<string, string>>({});
   const [purchaseWarehouses, setPurchaseWarehouses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function SavedPage(): JSX.Element {
         setPurchases(p);
         setAdjustments(a);
         // Fetch related product and warehouse names for purchases.
-        const productIds = Array.from(new Set(p.map((x) => x.product_id)));
+        const productIds = Array.from(new Set([...p.map((x) => x.product_id), ...w.map((x) => x.product_id)]));
         const warehouseIds = Array.from(new Set(p.map((x) => x.warehouse_id)));
         if (productIds.length) {
           const { data: prods } = await supabase()
@@ -43,6 +46,11 @@ export function SavedPage(): JSX.Element {
               map[r.id] = r.canonical_name;
             }
             setPurchaseProducts(map);
+            const watchMap: Record<string, string> = {};
+            for (const r of (prods ?? []) as { id: string; canonical_name: string }[]) {
+              watchMap[r.id] = r.canonical_name;
+            }
+            setWatchProducts(watchMap);
           }
         }
         if (warehouseIds.length) {
@@ -89,6 +97,7 @@ export function SavedPage(): JSX.Element {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Saved</IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -111,7 +120,7 @@ export function SavedPage(): JSX.Element {
                 <div className="cs-empty">
                   <p>You are not watching any products.</p>
                   <p className="cs-muted">Open a product and tap Watch to get notified when its verified price changes.</p>
-                  <IonButton onClick={() => location.assign('/home')}>Go to Home</IonButton>
+                  <IonButton onClick={() => history.push('/home')}>Go to Home</IonButton>
                 </div>
               ) : (
                 <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -119,7 +128,7 @@ export function SavedPage(): JSX.Element {
                     <li key={w.id} className="cs-card">
                       <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                         <div>
-                          <div className="cs-strong">Watch</div>
+                          <div className="cs-strong">{watchProducts[w.product_id] ?? 'Watch'}</div>
                           {w.target_price_cents != null && (
                             <div className="cs-muted">Target: {formatUSD(cents(w.target_price_cents))}</div>
                           )}
@@ -195,10 +204,31 @@ export function SavedPage(): JSX.Element {
           )}
 
           {!loading && section === 'deals' && (
-            <div className="cs-empty">
-              <p>You haven&apos;t saved any deals yet.</p>
-              <p className="cs-muted">Open a deal on the Deals tab to save it for later.</p>
-            </div>
+            <>
+              {watches.length === 0 ? (
+                <div className="cs-empty">
+                  <p>You haven&apos;t saved any deals yet.</p>
+                  <p className="cs-muted">Open a product and tap Watch to save it here.</p>
+                </div>
+              ) : (
+                <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {watches.map((w) => (
+                    <li key={`deal-${w.id}`}>
+                      <button
+                        className="cs-card"
+                        style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
+                        onClick={() => history.push(`/product/${w.product_id}`)}
+                      >
+                        <div className="cs-strong">{watchProducts[w.product_id] ?? 'Watched product'}</div>
+                        {w.target_price_cents != null && (
+                          <div className="cs-muted">Target: {formatUSD(cents(w.target_price_cents))}</div>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
       </IonContent>

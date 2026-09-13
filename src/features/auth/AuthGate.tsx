@@ -49,7 +49,7 @@ export function AuthGate({ children }: AuthGateProps): JSX.Element {
     return <DemoScreen />;
   }
   if (state === 'loading') {
-    return <IonLoading isOpen message="Signing you in..." />;
+    return <IonLoading isOpen message="Checking your session…" />;
   }
   if (state === 'out') {
     return <AuthScreen onSignedIn={() => setState('in')} />;
