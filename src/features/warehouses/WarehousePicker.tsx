@@ -1,4 +1,4 @@
-import { IonModal, IonSearchbar } from '@ionic/react';
+import { IonModal } from '@ionic/react';
 import { useMemo, useState } from 'react';
 import type { WarehouseRow } from '@services/api/warehouses';
 
@@ -11,6 +11,7 @@ interface WarehousePickerProps {
 
 export function WarehousePicker({ isOpen, warehouses, onSelect, onDismiss }: WarehousePickerProps): JSX.Element {
   const [q, setQ] = useState('');
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return warehouses;
@@ -23,26 +24,53 @@ export function WarehousePicker({ isOpen, warehouses, onSelect, onDismiss }: War
     );
   }, [q, warehouses]);
 
+  const picked = filtered.find((w) => w.id === pickedId) ?? null;
+
+  function close() {
+    setQ('');
+    setPickedId(null);
+    onDismiss();
+  }
+
+  function confirm() {
+    if (!picked) return;
+    onSelect(picked);
+    setQ('');
+    setPickedId(null);
+  }
+
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onDismiss}>
+    <IonModal isOpen={isOpen} onDidDismiss={close}>
       <div className="cs-page">
-        <h2 className="cs-section-title">Choose a warehouse</h2>
-        <IonSearchbar
-          value={q}
-          onIonInput={(e) => setQ(e.detail.value ?? '')}
-          placeholder="Search by name, number, or city"
-          aria-label="Search warehouses"
-        />
+        <header className="cs-header">
+          <h2 className="cs-header__title">Choose a warehouse</h2>
+          <p className="cs-header__sub">Select one, then confirm.</p>
+        </header>
+        <label className="cs-field">
+          <span className="cs-field__label">Search</span>
+          <input
+            className="cs-field__input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, number, or city"
+            aria-label="Search warehouses"
+          />
+        </label>
         <ul className="cs-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {filtered.length === 0 && (
-            <li className="cs-empty">No warehouses match.</li>
+            <li className="cs-state">
+              <p className="cs-state__title">No warehouses match</p>
+              <p>Try a city, warehouse number, or a shorter name.</p>
+            </li>
           )}
           {filtered.map((w) => (
             <li key={w.id}>
               <button
-                className="cs-card"
-                style={{ width: '100%', textAlign: 'left', border: '1px solid var(--cs-border)' }}
-                onClick={() => onSelect(w)}
+                type="button"
+                className={`cs-card${pickedId === w.id ? ' cs-card--selected' : ''}`}
+                style={{ width: '100%', textAlign: 'left' }}
+                onClick={() => setPickedId(w.id)}
+                aria-pressed={pickedId === w.id}
                 aria-label={`Select ${w.name}`}
               >
                 <div className="cs-strong">{w.name}</div>
@@ -58,9 +86,14 @@ export function WarehousePicker({ isOpen, warehouses, onSelect, onDismiss }: War
             </li>
           ))}
         </ul>
-        <button className="cs-button cs-button--ghost" style={{ marginTop: 'var(--cs-space-4)' }} onClick={onDismiss}>
-          Cancel
-        </button>
+        <div className="cs-actions">
+          <button className="cs-button" type="button" onClick={confirm} disabled={!picked}>
+            Confirm warehouse
+          </button>
+          <button className="cs-button cs-button--ghost" type="button" onClick={close}>
+            Cancel
+          </button>
+        </div>
       </div>
     </IonModal>
   );

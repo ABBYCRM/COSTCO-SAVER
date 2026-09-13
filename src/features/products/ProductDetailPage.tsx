@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useHistory } from 'react-router';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonBackButton, IonButtons, IonModal, IonInput, IonItem, IonLabel, IonCheckbox } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonBackButton, IonButtons, IonModal } from '@ionic/react';
 import { supabase } from '@services/supabase/client';
 import { useWarehouse } from '@stores/warehouse';
 import { formatUSD, cents } from '@domain/money/cents';
@@ -187,7 +187,16 @@ export function ProductDetailPage(): JSX.Element {
   }
 
   if (!productId) {
-    return <IonPage><IonContent><div className="cs-empty">No product selected.</div></IonContent></IonPage>;
+    return (
+      <IonPage>
+        <IonContent>
+          <div className="cs-state">
+            <p className="cs-state__title">No product selected</p>
+            <p>Open a product from Home, Deals, or Search.</p>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
   }
 
   return (
@@ -200,18 +209,20 @@ export function ProductDetailPage(): JSX.Element {
       </IonHeader>
       <IonContent fullscreen>
         <div className="cs-page">
-          {error && <p role="alert" style={{ color: 'var(--cs-danger)' }}>{error}</p>}
+          {error && <p className="cs-error" role="alert">{error}</p>}
 
-          <section className="cs-card">
-            <h2 className="cs-strong" style={{ margin: 0 }}>{product?.canonical_name ?? 'Loading…'}</h2>
-            {product?.brand && <div className="cs-muted">{product.brand}</div>}
-          </section>
+          <header className="cs-header">
+            <p className="cs-meta">{product?.brand ?? 'Product'}</p>
+            <h1 className="cs-header__title">{product?.canonical_name ?? 'Loading…'}</h1>
+            {product?.description && <p className="cs-header__sub">{product.description}</p>}
+          </header>
 
           {state && state.consensus_price_cents != null && selected ? (
-            <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
+            <section className="cs-card">
               <div className="cs-row" style={{ justifyContent: 'space-between' }}>
                 <div>
-                  <div className="cs-price" style={{ fontSize: 'var(--cs-font-size-7)', fontWeight: 700 }}>
+                  <p className="cs-meta" style={{ margin: 0 }}>Verified price</p>
+                  <div className="cs-price cs-deal-score">
                     {formatUSD(cents(state.consensus_price_cents))}
                   </div>
                   <div className="cs-muted">{selected.name}</div>
@@ -227,33 +238,37 @@ export function ProductDetailPage(): JSX.Element {
               </div>
               <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', gap: 'var(--cs-space-4)', flexWrap: 'wrap' }}>
                 <div>
-                  <div className="cs-muted">Confidence</div>
+                  <div className="cs-meta">Confidence</div>
                   <div className="cs-strong">{confidenceLabel(state.confidence_score)} · {state.confidence_score}/100</div>
                 </div>
                 <div>
-                  <div className="cs-muted">Evidence</div>
+                  <div className="cs-meta">Evidence</div>
                   <div className="cs-strong">{state.evidence_count} observations · {state.independent_confirmation_count} confirmations</div>
                 </div>
               </div>
-              <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)', flexWrap: 'wrap' }}>
-                <IonButton onClick={() => setShowWatchModal(true)}>Watch</IonButton>
-                <IonButton fill="outline" onClick={() => setShowConfirmModal(true)}>Verify price</IonButton>
-                <IonButton fill="outline" onClick={() => setShowChangeModal(true)}>Report change</IonButton>
-                <IonButton fill="outline" onClick={() => history.push(`/product/${productId}/buy`)}>Bought it</IonButton>
+              <div className="cs-actions">
+                <button className="cs-button" type="button" onClick={() => setShowWatchModal(true)}>Watch</button>
+                <button className="cs-button cs-button--ghost" type="button" onClick={() => setShowConfirmModal(true)}>Verify price</button>
+                <button className="cs-button cs-button--ghost" type="button" onClick={() => setShowChangeModal(true)}>Report change</button>
+                <button className="cs-button cs-button--ghost" type="button" onClick={() => history.push(`/product/${productId}/buy`)}>Bought it</button>
               </div>
             </section>
           ) : (
             <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-              <h3 className="cs-strong" style={{ margin: 0 }}>No price at this warehouse yet</h3>
-              <p className="cs-muted">Be the first shopper to submit a verified shelf price.</p>
-              <IonButton onClick={() => setShowChangeModal(true)}>Add / verify price</IonButton>
+              <div className="cs-state" style={{ padding: 'var(--cs-space-4) 0' }}>
+                <p className="cs-state__title">No price at this warehouse yet</p>
+                <p>Be the first shopper to submit a verified shelf price.</p>
+                <button className="cs-button" type="button" onClick={() => setShowChangeModal(true)}>
+                  Add / verify price
+                </button>
+              </div>
             </section>
           )}
-          {actionMessage && <p className="cs-strong" style={{ marginTop: 'var(--cs-space-3)' }} role="status">{actionMessage}</p>}
+          {actionMessage && <p className="cs-success" style={{ marginTop: 'var(--cs-space-3)' }} role="status">{actionMessage}</p>}
 
           {state && state.consensus_price_cents != null && (
             <section className="cs-card" style={{ marginTop: 'var(--cs-space-3)' }}>
-              <h3 className="cs-strong" style={{ margin: 0 }}>Deal</h3>
+              <p className="cs-meta" style={{ margin: 0 }}>Deal</p>
               <DealBreakdown
                 cents={state.consensus_price_cents}
                 markdown={state.markdown_class}
@@ -267,54 +282,66 @@ export function ProductDetailPage(): JSX.Element {
 
       <IonModal isOpen={showConfirmModal} onDidDismiss={() => setShowConfirmModal(false)}>
         <div className="cs-page">
-          <h2 className="cs-section-title">Verify price</h2>
-          <p className="cs-muted">
-            Is the current shelf price at {selected?.name ?? 'this warehouse'} still{' '}
-            <span className="cs-strong">{state?.consensus_price_cents ? formatUSD(cents(state.consensus_price_cents)) : '—'}</span>?
-          </p>
-          <IonItem>
-            <IonLabel position="stacked">Current price you see (USD)</IonLabel>
-            <IonInput
+          <header className="cs-header">
+            <h2 className="cs-header__title">Verify price</h2>
+            <p className="cs-header__sub">
+              Is the current shelf price at {selected?.name ?? 'this warehouse'} still{' '}
+              <span className="cs-strong">{state?.consensus_price_cents ? formatUSD(cents(state.consensus_price_cents)) : '—'}</span>?
+            </p>
+          </header>
+          <label className="cs-field">
+            <span className="cs-field__label">Current price you see (USD)</span>
+            <input
+              className="cs-field__input"
               inputMode="decimal"
               value={confirmPrice}
-              onIonChange={(e) => setConfirmPrice(e.detail.value ?? '')}
+              onChange={(e) => setConfirmPrice(e.target.value)}
               placeholder={state?.consensus_price_cents ? (state.consensus_price_cents / 100).toFixed(2) : '19.97'}
             />
-          </IonItem>
-          <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleConfirmPrice} disabled={busy || !confirmPrice}>
+          </label>
+          <div className="cs-actions">
+            <button className="cs-button" type="button" onClick={handleConfirmPrice} disabled={busy || !confirmPrice}>
               {busy ? 'Submitting…' : 'Confirm'}
-            </IonButton>
-            <IonButton fill="outline" onClick={() => setShowConfirmModal(false)}>Cancel</IonButton>
+            </button>
+            <button className="cs-button cs-button--ghost" type="button" onClick={() => setShowConfirmModal(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       </IonModal>
 
       <IonModal isOpen={showChangeModal} onDidDismiss={() => setShowChangeModal(false)}>
         <div className="cs-page">
-          <h2 className="cs-section-title">Report a different price</h2>
-          <IonItem>
-            <IonLabel position="stacked">New price (USD)</IonLabel>
-            <IonInput
+          <header className="cs-header">
+            <h2 className="cs-header__title">Report a different price</h2>
+            <p className="cs-header__sub">Submit the shelf price you see right now.</p>
+          </header>
+          <label className="cs-field">
+            <span className="cs-field__label">New price (USD)</span>
+            <input
+              className="cs-field__input"
               inputMode="decimal"
               value={changePrice}
-              onIonChange={(e) => setChangePrice(e.detail.value ?? '')}
+              onChange={(e) => setChangePrice(e.target.value)}
               placeholder="e.g. 19.97"
             />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Asterisk on tag (no restock)</IonLabel>
-            <IonCheckbox
+          </label>
+          <label className="cs-field cs-field--check">
+            <input
+              className="cs-field__checkbox"
+              type="checkbox"
               checked={changeHasAsterisk}
-              onIonChange={(e) => setChangeHasAsterisk(e.detail.checked)}
-              slot="end"
+              onChange={(e) => setChangeHasAsterisk(e.target.checked)}
             />
-          </IonItem>
-          <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleReportChange} disabled={busy || !changePrice || !selected}>
+            <span className="cs-field__label">Asterisk on tag (no restock)</span>
+          </label>
+          <div className="cs-actions">
+            <button className="cs-button" type="button" onClick={handleReportChange} disabled={busy || !changePrice || !selected}>
               {busy ? 'Submitting…' : 'Submit'}
-            </IonButton>
-            <IonButton fill="outline" onClick={() => setShowChangeModal(false)}>Cancel</IonButton>
+            </button>
+            <button className="cs-button cs-button--ghost" type="button" onClick={() => setShowChangeModal(false)}>
+              Cancel
+            </button>
           </div>
           {!selected && <p className="cs-muted">Pick a warehouse on Home first.</p>}
         </div>
@@ -322,36 +349,63 @@ export function ProductDetailPage(): JSX.Element {
 
       <IonModal isOpen={showWatchModal} onDidDismiss={() => setShowWatchModal(false)}>
         <div className="cs-page">
-          <h2 className="cs-section-title">Watch this product</h2>
-          <p className="cs-muted">You will get a push notification when one of these conditions is met.</p>
-          <IonItem>
-            <IonLabel position="stacked">Target price (USD, optional)</IonLabel>
-            <IonInput
+          <header className="cs-header">
+            <h2 className="cs-header__title">Watch this product</h2>
+            <p className="cs-header__sub">You will get a push notification when one of these conditions is met.</p>
+          </header>
+          <label className="cs-field">
+            <span className="cs-field__label">Target price (USD, optional)</span>
+            <input
+              className="cs-field__input"
               inputMode="decimal"
               value={watchTargetPrice}
-              onIonChange={(e) => setWatchTargetPrice(e.detail.value ?? '')}
+              onChange={(e) => setWatchTargetPrice(e.target.value)}
               placeholder="e.g. 17.99"
             />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Notify on any price drop</IonLabel>
-            <IonCheckbox checked={watchAnyDrop} onIonChange={(e) => setWatchAnyDrop(e.detail.checked)} slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Notify on .97 clearance</IonLabel>
-            <IonCheckbox checked={watchClearance} onIonChange={(e) => setWatchClearance(e.detail.checked)} slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Notify on .00 / .88 manager markdown</IonLabel>
-            <IonCheckbox checked={watchManager} onIonChange={(e) => setWatchManager(e.detail.checked)} slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>Notify on asterisk (final stock)</IonLabel>
-            <IonCheckbox checked={watchAsterisk} onIonChange={(e) => setWatchAsterisk(e.detail.checked)} slot="end" />
-          </IonItem>
-          <div className="cs-row" style={{ marginTop: 'var(--cs-space-3)' }}>
-            <IonButton onClick={handleCreateWatch} disabled={busy}>Save watch</IonButton>
-            <IonButton fill="outline" onClick={() => setShowWatchModal(false)}>Cancel</IonButton>
+          </label>
+          <label className="cs-field cs-field--check">
+            <input
+              className="cs-field__checkbox"
+              type="checkbox"
+              checked={watchAnyDrop}
+              onChange={(e) => setWatchAnyDrop(e.target.checked)}
+            />
+            <span className="cs-field__label">Notify on any price drop</span>
+          </label>
+          <label className="cs-field cs-field--check">
+            <input
+              className="cs-field__checkbox"
+              type="checkbox"
+              checked={watchClearance}
+              onChange={(e) => setWatchClearance(e.target.checked)}
+            />
+            <span className="cs-field__label">Notify on .97 clearance</span>
+          </label>
+          <label className="cs-field cs-field--check">
+            <input
+              className="cs-field__checkbox"
+              type="checkbox"
+              checked={watchManager}
+              onChange={(e) => setWatchManager(e.target.checked)}
+            />
+            <span className="cs-field__label">Notify on .00 / .88 manager markdown</span>
+          </label>
+          <label className="cs-field cs-field--check">
+            <input
+              className="cs-field__checkbox"
+              type="checkbox"
+              checked={watchAsterisk}
+              onChange={(e) => setWatchAsterisk(e.target.checked)}
+            />
+            <span className="cs-field__label">Notify on asterisk (final stock)</span>
+          </label>
+          <div className="cs-actions">
+            <button className="cs-button" type="button" onClick={handleCreateWatch} disabled={busy}>
+              Save watch
+            </button>
+            <button className="cs-button cs-button--ghost" type="button" onClick={() => setShowWatchModal(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       </IonModal>
@@ -374,9 +428,9 @@ function DealBreakdown({ cents, markdown, confidence, freshness }: {
   });
   return (
     <div className="cs-stack">
-      <div className="cs-row" style={{ justifyContent: 'space-between' }}>
-        <div className="cs-strong">{score.rating}</div>
-        <div className="cs-strong" style={{ fontSize: 'var(--cs-font-size-5)' }}>{score.score}</div>
+      <div className="cs-row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <span className={`cs-deal-rating ${ratingClass(score.rating)}`}>{score.rating}</span>
+        <div className="cs-deal-score">{score.score}</div>
       </div>
       <div className="cs-muted">
         Markdown {score.components.markdownSignal} · Confidence {score.components.confidence} ·
@@ -384,4 +438,11 @@ function DealBreakdown({ cents, markdown, confidence, freshness }: {
       </div>
     </div>
   );
+}
+
+function ratingClass(rating: string): string {
+  if (rating === 'Excellent Deal' || rating === 'Great Deal') return 'cs-deal-rating--great';
+  if (rating === 'Good Deal') return 'cs-deal-rating--good';
+  if (rating === 'Fair') return 'cs-deal-rating--ok';
+  return 'cs-deal-rating--hold';
 }
