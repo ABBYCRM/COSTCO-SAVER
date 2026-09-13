@@ -1,0 +1,54 @@
+/* COSTCO-SAVER Admin Console */
+:root {
+  --bg: #0b1220;
+  --surface: #111b30;
+  --text: #f5f7fb;
+  --muted: #aab2c5;
+  --brand: #5ee2a4;
+  --border: #1e2a44;
+  --danger: #ff6b6b;
+  --warning: #f5b94a;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cs-admin {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.cs-admin h1 { font-size: 22px; margin: 0 0 4px 0; }
+.cs-admin h2 { font-size: 16px; margin: 24px 0 8px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.cs-admin-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.cs-admin-row { display: flex; gap: 16px; align-items: center; min-height: 32px; }
+.cs-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+.cs-admin-stat { padding: 12px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); }
+.cs-admin-stat-value { font-size: 22px; font-weight: 700; }
+.cs-admin-stat-label { color: var(--muted); font-size: 12px; }
+
+.cs-admin-table { width: 100%; border-collapse: collapse; }
+.cs-admin-table th, .cs-admin-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.cs-admin-table th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+
+.cs-admin-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.cs-admin-pill--open { background: rgba(106,183,255,0.16); color: #6ab7ff; }
+.cs-admin-pill--review { background: rgba(245,185,74,0.18); color: var(--warning); }
+.cs-admin-pill--resolved { background: rgba(94,226,164,0.16); color: var(--brand); }
+
+.cs-admin-button { background: var(--brand); color: var(--bg); border: 0; border-radius: 6px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
+.cs-admin-button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.cs-admin-button--ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+
+.cs-admin-error { color: var(--danger); }
+.cs-admin-muted { color: var(--muted); }

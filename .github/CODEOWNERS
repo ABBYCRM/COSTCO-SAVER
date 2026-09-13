@@ -1,0 +1,13 @@
+# CODEOWNERS — COSTCO-SAVER
+# Default: maintainer review required for every PR.
+*       @ABBYCRM
+
+# Domain logic: stricter review because it ships the spec.
+# /src/domain/        @ABBYCRM
+
+# Migrations: must be reviewed alongside PRs that touch the DB.
+/supabase/migrations/ @ABBYCRM
+
+# CI config changes must be reviewed before merge.
+/.github/workflows/    @ABBYCRM
+/codemagic.yaml        @ABBYCRM

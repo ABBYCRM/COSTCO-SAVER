@@ -1,0 +1,94 @@
+/*
+ * COSTCO-SAVER — design tokens.
+ * Spec §65, §66. Brand language: precision savings.
+ * No Costco visual imitation; this is the COSTCO-SAVER identity.
+ */
+
+:root {
+  /* Surfaces */
+  --cs-surface: #0b1220;
+  --cs-surface-elevated: #111b30;
+  --cs-surface-card: #14223c;
+  --cs-surface-overlay: rgba(11, 18, 32, 0.72);
+
+  /* Text */
+  --cs-text-primary: #f5f7fb;
+  --cs-text-secondary: #aab2c5;
+  --cs-text-tertiary: #6f7a92;
+  --cs-text-on-brand: #0b1220;
+
+  /* Borders */
+  --cs-border: #1e2a44;
+  --cs-border-strong: #2c3b5e;
+
+  /* Brand */
+  --cs-brand: #5ee2a4;
+  --cs-brand-soft: rgba(94, 226, 164, 0.16);
+  --cs-brand-deep: #1f8a5a;
+
+  /* Status (semantic, not color-only) */
+  --cs-saving: #5ee2a4;
+  --cs-verified: #6ab7ff;
+  --cs-fresh: #5ee2a4;
+  --cs-aging: #f5b94a;
+  --cs-historical: #aab2c5;
+  --cs-warning: #f5b94a;
+  --cs-danger: #ff6b6b;
+  --cs-clearance: #ff8a4a;
+
+  /* Spacing */
+  --cs-space-1: 4px;
+  --cs-space-2: 8px;
+  --cs-space-3: 12px;
+  --cs-space-4: 16px;
+  --cs-space-5: 24px;
+  --cs-space-6: 32px;
+  --cs-space-7: 48px;
+
+  /* Radius */
+  --cs-radius-1: 6px;
+  --cs-radius-2: 10px;
+  --cs-radius-3: 14px;
+  --cs-radius-4: 20px;
+  --cs-radius-pill: 999px;
+
+  /* Typography */
+  --cs-font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --cs-font-mono:
+    "SF Mono", ui-monospace, "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  --cs-font-size-1: 12px;
+  --cs-font-size-2: 14px;
+  --cs-font-size-3: 16px;
+  --cs-font-size-4: 18px;
+  --cs-font-size-5: 22px;
+  --cs-font-size-6: 28px;
+  --cs-font-size-7: 36px;
+
+  --cs-line-tight: 1.2;
+  --cs-line-base: 1.45;
+  --cs-line-relaxed: 1.6;
+
+  /* Shadows */
+  --cs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --cs-shadow-2: 0 4px 14px rgba(0, 0, 0, 0.36);
+  --cs-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  /* Motion */
+  --cs-easing-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cs-duration-1: 120ms;
+  --cs-duration-2: 200ms;
+  --cs-duration-3: 320ms;
+
+  /* Touch targets (a11y: ≥ 44×44 per spec §69) */
+  --cs-touch-min: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --cs-duration-1: 0ms;
+    --cs-duration-2: 0ms;
+    --cs-duration-3: 0ms;
+  }
+}
