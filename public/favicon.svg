@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#0B1220"/>
-  <path d="M9 22 L16 8 L23 22 Z" fill="#5EE2A4"/>
-  <text x="16" y="20" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="9" font-weight="700" fill="#0B1220">CS</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#F4EFE6"/>
+  <path fill="#1F7A4C" d="M6.4 17.2 16.8 6.8h9.2v9.2L16.4 25.6z"/>
+  <circle cx="22.8" cy="10.2" r="2.4" fill="#F4EFE6"/>
 </svg>
