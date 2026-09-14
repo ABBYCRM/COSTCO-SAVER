@@ -14,13 +14,10 @@ export default defineConfig({
         short_name: 'COSTCO-SAVER',
         description:
           'Price intelligence for Costco. Pin a warehouse, scan a barcode, see the real clearance markdowns in your area — with confidence, freshness, and consensus from real observations.',
-        theme_color: '#0B1220',
-        background_color: '#0B1220',
+        theme_color: '#F4EFE6',
+        background_color: '#F4EFE6',
         display: 'standalone',
         orientation: 'portrait',
-        // GH Pages subpath hosting. Override the default scope/start_url to
-        // /COSTCO-SAVER/ so the installed PWA opens the app, not the GH Pages
-        // root. Override GH_PAGES_BASE at build time for custom domains.
         scope: process.env.GH_PAGES_BASE || '/COSTCO-SAVER/',
         start_url: process.env.GH_PAGES_BASE || '/COSTCO-SAVER/',
         categories: ['shopping', 'utilities', 'finance'],
@@ -46,8 +43,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache the app shell + core chunks. Supabase calls are runtime
-        // network-only; static assets get cache-first.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/assets\//],
@@ -59,7 +54,7 @@ export default defineConfig({
               cacheName: 'costco-saver-assets-v1',
               expiration: {
                 maxEntries: 64,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 30,
               },
             },
           },
@@ -72,14 +67,14 @@ export default defineConfig({
               networkTimeoutSeconds: 8,
               expiration: {
                 maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
+                maxAgeSeconds: 60 * 60 * 24,
               },
             },
           },
         ],
       },
       devOptions: {
-        enabled: false, // don't generate sw during dev — keeps HMR clean
+        enabled: false,
       },
     }),
   ],
@@ -103,12 +98,6 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Keep react-router + @ionic/react-router in the SAME chunk.
-        // They have a circular dep (Ionic's react-router re-exports from
-        // react-router-dom; react-router-dom uses some Ionic internals).
-        // Splitting them across vendor/ionic chunks produced a TDZ error
-        // "Cannot access 'w' before initialization" at boot.
-        // Verified 2026-09-12 — see agent memory COSTCO-SAVER entry.
         manualChunks: {
           react: ['react', 'react-dom', 'react-router', 'react-router-dom', '@ionic/react', '@ionic/react-router'],
           supabase: ['@supabase/supabase-js'],
