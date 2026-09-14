@@ -2,7 +2,6 @@
  * WarehousePicker — bottom sheet modal for choosing the active warehouse.
  */
 
-// (history unused in picker)
 import { useApp } from '@data/store';
 import { distanceMiles, useSelectedWarehouse } from '@data/selectors';
 import { Pill } from '@components/UI';
@@ -25,7 +24,7 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.6)',
+        background: 'rgba(28, 25, 21, 0.32)',
         backdropFilter: 'blur(4px)',
         zIndex: 200,
         display: 'flex',
@@ -35,7 +34,7 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#0F172A',
+          background: 'var(--cs-surface)',
           width: '100%',
           maxWidth: 720,
           margin: '0 auto',
@@ -44,7 +43,7 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
           padding: '16px 16px 32px',
           maxHeight: '80vh',
           overflowY: 'auto',
-          border: '1px solid #1F2937',
+          border: '1px solid var(--cs-elevated)',
         }}
         role="dialog"
         aria-modal="true"
@@ -53,7 +52,7 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
           style={{
             width: 40,
             height: 4,
-            background: '#374151',
+            background: 'var(--cs-border-strong)',
             borderRadius: 999,
             margin: '0 auto 16px',
           }}
@@ -67,8 +66,8 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
             marginBottom: 12,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#F9FAFB' }}>
-            Choose warehouse
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--cs-text)' }}>
+            Pick a store
           </h2>
           <button
             onClick={onClose}
@@ -76,7 +75,7 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
             style={{
               background: 'transparent',
               border: 0,
-              color: '#9CA3AF',
+              color: 'var(--cs-muted)',
               fontSize: 22,
               cursor: 'pointer',
               width: 32,
@@ -102,11 +101,11 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
                   onClose();
                 }}
                 style={{
-                  background: isSelected ? '#34D39915' : '#111827',
-                  border: isSelected ? '2px solid #34D399' : '1px solid #1F2937',
+                  background: isSelected ? 'var(--cs-accent-soft)' : 'var(--cs-card)',
+                  border: isSelected ? '2px solid var(--cs-accent)' : '1px solid var(--cs-elevated)',
                   borderRadius: 14,
                   padding: 14,
-                  color: '#E5E7EB',
+                  color: 'var(--cs-text)',
                   textAlign: 'left',
                   cursor: 'pointer',
                 }}
@@ -120,16 +119,16 @@ export function WarehousePicker({ open, onClose }: Props): JSX.Element | null {
                   }}
                 >
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{w.name}</div>
-                  {isSelected && <Pill color="#34D399" bg="#34D39920">Active</Pill>}
+                  {isSelected && <Pill color="var(--cs-accent)" bg="var(--cs-accent-soft)">Active</Pill>}
                 </div>
-                <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                <div style={{ fontSize: 12, color: 'var(--cs-muted)' }}>
                   #{w.number} · {w.address}, {w.city}, {w.state}
                 </div>
                 {miles > 0 && (
                   <div
                     style={{
                       fontSize: 11,
-                      color: '#6B7280',
+                      color: 'var(--cs-subtle)',
                       marginTop: 4,
                     }}
                   >
