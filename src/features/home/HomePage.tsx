@@ -1,13 +1,5 @@
 /**
- * HomePage — the user's anchor screen.
- *
- * Renders:
- *  - Hero warehouse card (full address + change CTA)
- *  - Coverage radar SVG (4-axis health score)
- *  - Nearby warehouses (tap to switch)
- *  - "Drops near you" — vertical list of markdown products at the active warehouse
- *  - "Watchlist hits" — quick view of triggered watches
- *  - Sticky bottom Scan CTA
+ * HomePage — store card, nearby warehouses, live markdowns.
  */
 
 import { useState } from 'react';
@@ -30,7 +22,6 @@ import {
   Section,
 } from '@components/UI';
 import { ProductImage } from '@components/ProductImage';
-import { CoverageRadar } from '@features/warehouses/CoverageRadar';
 import { WarehousePicker } from '@features/warehouses/WarehousePicker';
 
 export function HomePage(): JSX.Element {
@@ -60,271 +51,116 @@ export function HomePage(): JSX.Element {
     }))
     .sort((a, b) => a.miles - b.miles);
 
-  const totalSavings = triggeredWatches.reduce(
-    (sum, w) => sum + Math.max(0, w.current_cents - w.target_cents),
-    0,
-  );
-
   return (
     <>
       <OfflineBanner />
-      <div
-        style={{
-          maxWidth: 720,
-          margin: '0 auto',
-          padding: '20px 16px 100px',
-          color: '#E5E7EB',
-        }}
-      >
-        {/* Greeting */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1 }}>
-            Hello, {handle}
-          </div>
-          <h1
-            style={{
-              margin: '4px 0 0',
-              fontSize: 28,
-              fontWeight: 800,
-              color: '#F9FAFB',
-              lineHeight: 1.15,
-            }}
-          >
-            Scan it before you <span style={{ color: '#34D399' }}>buy</span> it.
+      <div className="cs-page">
+        <header style={{ marginBottom: 20 }}>
+          <p className="cs-kicker">Hi, {handle}</p>
+          <h1 className="cs-title">
+            What's on sale <em>today</em>?
           </h1>
-        </div>
+        </header>
 
-        {/* Hero warehouse card */}
-        <Card
-          padding={20}
-          style={{
-            marginBottom: 16,
-            background: 'linear-gradient(135deg, #111827 0%, #0F172A 100%)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <div
+        <button type="button" className="cs-store" onClick={() => setPickerOpen(true)}>
+          <img
+            src="/images/warehouse.jpg"
+            alt=""
+            style={{ height: 144, width: '100%', objectFit: 'cover', objectPosition: '72% center' }}
+          />
+          <span style={{ display: 'block', padding: 16 }}>
+            <span className="cs-kicker">Shopping at #{warehouse.number}</span>
+            <span
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
-                display: 'grid',
-                placeItems: 'center',
+                display: 'block',
+                marginTop: 4,
                 fontSize: 22,
                 fontWeight: 800,
-                color: '#0B1220',
-                flexShrink: 0,
-              }}
-              aria-hidden
-            >
-              $
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: '#9CA3AF',
-                  textTransform: 'uppercase',
-                  letterSpacing: 1,
-                  marginBottom: 2,
-                }}
-              >
-                Your warehouse
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: '#F9FAFB', marginBottom: 2 }}>
-                {warehouse.name}
-              </div>
-              <div style={{ fontSize: 13, color: '#9CA3AF', lineHeight: 1.4 }}>
-                {warehouse.address} · {warehouse.city}, {warehouse.state} {warehouse.zip}
-              </div>
-              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>{warehouse.hours}</div>
-            </div>
-          </div>
-          <button
-            onClick={() => setPickerOpen(true)}
-            style={{
-              marginTop: 14,
-              width: '100%',
-              background: 'transparent',
-              border: '1px solid #374151',
-              borderRadius: 10,
-              padding: '10px 14px',
-              color: '#E5E7EB',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            Change warehouse <span aria-hidden>→</span>
-          </button>
-        </Card>
-
-        {/* Coverage radar */}
-        {wHealth && (
-          <Card padding={20} style={{ marginBottom: 16 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 12,
+                letterSpacing: '-0.03em',
               }}
             >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: '#9CA3AF',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                  }}
-                >
-                  Warehouse health
-                </div>
-                <div
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: '#F9FAFB',
-                    marginTop: 2,
-                  }}
-                >
-                  Coverage score
-                </div>
-              </div>
-              <div
-                style={{
-                  background: '#34D39920',
-                  borderRadius: 999,
-                  padding: '6px 12px',
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: '#34D399',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {Math.round(
-                  (wHealth.coverage_pct + wHealth.avg_confidence + wHealth.freshness_score) / 3,
-                )}
-              </div>
-            </div>
-            <CoverageRadar health={wHealth} />
-            <div
-              style={{
-                display: 'flex',
-                gap: 12,
-                marginTop: 12,
-                fontSize: 12,
-                color: '#9CA3AF',
-              }}
-            >
-              <span>
-                <strong style={{ color: '#E5E7EB' }}>{wHealth.observation_count}</strong>{' '}
-                observations
+              {warehouse.city}
+            </span>
+            <span style={{ display: 'block', marginTop: 6, fontSize: 14, color: 'var(--cs-muted)', lineHeight: 1.5 }}>
+              {warehouse.address}
+              <br />
+              {warehouse.hours}
+            </span>
+            {wHealth ? (
+              <span style={{ display: 'block', marginTop: 12, fontSize: 12, fontWeight: 600, color: 'var(--cs-muted)' }}>
+                {wHealth.observation_count} prices on the floor · {wHealth.coverage_pct}% covered
               </span>
-              <span>
-                <strong style={{ color: '#E5E7EB' }}>{wHealth.velocity}</strong> / 24h
-              </span>
-            </div>
-          </Card>
-        )}
+            ) : null}
+            <span style={{ display: 'inline-block', marginTop: 12, fontSize: 14, fontWeight: 800, color: 'var(--cs-accent)' }}>
+              Switch store →
+            </span>
+          </span>
+        </button>
 
-        {/* Nearby warehouses */}
         {nearby.length > 0 && (
-          <Card padding={16} style={{ marginBottom: 16 }}>
-            <div
-              style={{
-                fontSize: 11,
-                color: '#9CA3AF',
-                textTransform: 'uppercase',
-                letterSpacing: 1,
-                marginBottom: 10,
-              }}
-            >
-              Nearby warehouses
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <section style={{ marginTop: 22 }}>
+            <h2 style={{ margin: '0 0 10px', fontSize: 17, fontWeight: 800 }}>Nearby stores</h2>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
               {nearby.map((w) => (
                 <button
                   key={w.id}
-                  onClick={() => {
-                    setWarehouse(w.id);
-                    setPickerOpen(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    background: '#0B1220',
-                    border: '1px solid #1F2937',
-                    borderRadius: 10,
-                    padding: '10px 12px',
-                    color: '#E5E7EB',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
+                  type="button"
+                  className="cs-card"
+                  onClick={() => setWarehouse(w.id)}
+                  style={{ minWidth: 148, flexShrink: 0, padding: '12px 16px', textAlign: 'left' }}
                 >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 999,
-                      background: '#34D399',
-                      flexShrink: 0,
-                    }}
-                    aria-hidden
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                      {w.address} · {w.city}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: '#9CA3AF',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {w.miles.toFixed(1)} mi
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{w.city}</div>
+                  <div style={{ fontSize: 12, color: 'var(--cs-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                    {w.miles.toFixed(1)} mi · #{w.number}
                   </div>
                 </button>
               ))}
             </div>
-          </Card>
+          </section>
         )}
 
-        {/* Drops near you */}
+        {triggeredWatches.length > 0 && (
+          <Section title="Watch hits">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {triggeredWatches.slice(0, 3).map((w) => {
+                const product = products.find((p) => p.id === w.product_id);
+                if (!product) return null;
+                return (
+                  <Card
+                    key={w.id}
+                    padding={12}
+                    onClick={() => history.push(`/product/${product.id}`)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                  >
+                    <ProductImage product={product} size={48} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800 }}>{product.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--cs-muted)' }}>
+                        Now {formatCents(w.current_cents)} · Target {formatCents(w.target_cents)}
+                      </div>
+                    </div>
+                    <Pill>Hit</Pill>
+                  </Card>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
         <Section
-          title={`Drops at ${warehouse.city}`}
+          title="On sale nearby"
           action={
-            <span
+            <button
+              type="button"
               onClick={() => history.push('/deals')}
-              style={{
-                fontSize: 12,
-                color: '#34D399',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-              role="button"
-              tabIndex={0}
+              style={{ fontSize: 13, color: 'var(--cs-accent)', fontWeight: 800 }}
             >
-              See all →
-            </span>
+              All deals →
+            </button>
           }
         >
           {drops.length === 0 ? (
-            <EmptyState
-              icon="🔍"
-              title="No markdowns right now"
-              body="When someone submits a markdown at this warehouse it'll appear here."
-            />
+            <EmptyState title="No markdowns yet" body="Scan a shelf tag to start the feed at this warehouse." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {drops.map((d) => (
@@ -334,139 +170,34 @@ export function HomePage(): JSX.Element {
                   onClick={() => history.push(`/product/${d.product.id}`)}
                   style={{ display: 'flex', gap: 12, alignItems: 'center' }}
                 >
-                  <ProductImage product={d.product} size={64} />
+                  <ProductImage product={d.product} size={80} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
                         fontSize: 14,
-                        fontWeight: 700,
-                        color: '#F9FAFB',
-                        whiteSpace: 'nowrap',
+                        fontWeight: 800,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
                       }}
                     >
                       {d.product.name}
                     </div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--cs-muted)', marginTop: 2 }}>
                       #{d.product.costco_item_number} · {d.product.size}
                     </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 6,
-                        marginTop: 6,
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                      }}
-                    >
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <MarkdownBadge cls={d.observation.markdown_class} />
                       <FreshnessDot cls={d.observation.freshness_class} showLabel />
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <Price cents={d.observation.price_cents} size="lg" color="#34D399" />
-                  </div>
+                  <Price cents={d.observation.price_cents} size="lg" color="var(--cs-text)" />
                 </Card>
               ))}
             </div>
           )}
         </Section>
-
-        {/* Watchlist hits */}
-        {triggeredWatches.length > 0 && (
-          <Section
-            title="Watchlist hits"
-            action={
-              <span
-                onClick={() => history.push('/saved')}
-                style={{
-                  fontSize: 12,
-                  color: '#34D399',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                See all →
-              </span>
-            }
-          >
-            <Card
-              padding={16}
-              style={{
-                background: 'linear-gradient(135deg, #34D39915 0%, #111827 100%)',
-                borderColor: '#34D39940',
-              }}
-            >
-              <div style={{ fontSize: 14, color: '#F9FAFB', marginBottom: 8 }}>
-                <strong style={{ color: '#34D399' }}>{triggeredWatches.length}</strong>{' '}
-                watch{totalSavings > 0 ? ` saving you ${formatCents(totalSavings)}` : ' triggered'}
-              </div>
-              {triggeredWatches.slice(0, 3).map((w) => {
-                const product = products.find((p) => p.id === w.product_id);
-                if (!product) return null;
-                return (
-                  <div
-                    key={w.id}
-                    onClick={() => history.push(`/product/${product.id}`)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingTop: 8,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <ProductImage product={product} size={40} rounded />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#E5E7EB' }}>
-                        {product.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                        Now {formatCents(w.current_cents)} · Target{' '}
-                        {formatCents(w.target_cents)}
-                      </div>
-                    </div>
-                    <Pill color="#34D399" bg="#34D39920">
-                      ↓ hit
-                    </Pill>
-                  </div>
-                );
-              })}
-            </Card>
-          </Section>
-        )}
-
-        {/* Sticky bottom scan CTA */}
-        <button
-          onClick={() => history.push('/scan')}
-          style={{
-            position: 'fixed',
-            bottom: 90,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'calc(100% - 32px)',
-            maxWidth: 380,
-            background: 'linear-gradient(135deg, #34D399 0%, #10B981 100%)',
-            color: '#0B1220',
-            border: 0,
-            borderRadius: 999,
-            padding: '14px 20px',
-            fontSize: 15,
-            fontWeight: 800,
-            boxShadow: '0 8px 24px rgba(52, 211, 153, 0.4)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            zIndex: 100,
-          }}
-        >
-          <span style={{ fontSize: 18 }}>📷</span> Scan a barcode
-        </button>
       </div>
 
       <WarehousePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
